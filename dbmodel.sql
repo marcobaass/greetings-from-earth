@@ -30,3 +30,38 @@
 
 -- Example 2: add a custom field to the standard "player" table
 -- ALTER TABLE `player` ADD `player_my_custom_field` INT UNSIGNED NOT NULL DEFAULT 0;
+
+
+
+-- Player board state — one row per player per covered cell
+CREATE TABLE IF NOT EXISTS `player_cells` (
+    `player_id`     INT(10)         NOT NULL,
+    `x`             TINYINT(2)      NOT NULL,
+    `y`             TINYINT(2)      NOT NULL,
+    `tile_type`     VARCHAR(4)      NOT NULL,
+    PRIMARY KEY (`player_id`, `x`, `y`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- Player state — one row per player, tracks progress and collected items
+CREATE TABLE IF NOT EXISTS `player_state` (
+    `player_id`             INT(10)         NOT NULL,
+    `last_x`                TINYINT(2)      DEFAULT NULL,
+    `last_y`                TINYINT(2)      DEFAULT NULL,
+    `has_started`           TINYINT(1)      NOT NULL DEFAULT 0,
+    `currywurst_count`      TINYINT(2)      NOT NULL DEFAULT 0,
+    `escooter_count`        TINYINT(2)      NOT NULL DEFAULT 0,
+    `ufo_count`             TINYINT(2)      NOT NULL DEFAULT 0,
+    `collection_count`      TINYINT(2)      NOT NULL DEFAULT 0,
+    `monument_count`        TINYINT(2)      NOT NULL DEFAULT 0,
+    `street_art_progress`   TINYINT(2)      NOT NULL DEFAULT 0,
+    `pending_bonus_tiles`   VARCHAR(128)    NOT NULL DEFAULT '[]',
+    `mustsee_completed`     VARCHAR(32)     NOT NULL DEFAULT '[]',
+    PRIMARY KEY (`player_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- Round state — shared across all players
+CREATE TABLE IF NOT EXISTS `game_state` (
+    `key`           VARCHAR(32)     NOT NULL,
+    `value`         VARCHAR(128)    NOT NULL,
+    PRIMARY KEY (`key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;

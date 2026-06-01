@@ -1,0 +1,20 @@
+{
+    "name": "BGA",
+    "host": "1.studio.boardgamearena.com",
+    "protocol": "sftp",
+    "port": 2022,
+    "username": "YOUR_BGA_USERNAME",
+    "remotePath": "/YOUR_PROJECT_NAME",
+    "interactiveAuth": true,
+    "uploadOnSave": true,
+    "ignore": [".git", ".vscode", "misc", "node_modules", "_ide_helper.php"],
+    "syncOption": {
+        "skipCreate": false,
+        "delete": true
+    },
+    "watcher": {
+        "files": "**/*.{js,css}",
+        "autoUpload": true,
+        "autoDelete": true
+    }
+}
