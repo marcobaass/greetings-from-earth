@@ -40,10 +40,24 @@ export class Game {
             document.getElementById('gfe-player-boards').insertAdjacentHTML('beforeend', `
                 <div id="gfe-board-${playerId}" class="gfe-player-board">
                     <strong>${player.name}</strong>
-                    <div id="gfe-grid-${playerId}" class="gfe-grid"></div>
+                    <div id="gfe-sheet-${playerId}" class="gfe-sheet">
+                        <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
+                        <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
+                    </div>
                 </div>
             `);
-            // TODO: render the Berlin map grid for this player
+
+        // Set up player's play grid
+        const playGridEl = document.getElementById(`gfe-play-grid-${playerId}`);
+        if (playGridEl) {
+            let cellsHTML = '';
+            for (let y = 0; y < 13; y++) {
+                for (let x = 0; x < 18; x++) {
+                    cellsHTML += `<div class="gfe-cell" data-x="${x}" data-y="${y}"></div>`;
+                }
+            }
+            playGridEl.innerHTML = cellsHTML;
+        }
         });
 
         this.setupNotifications();

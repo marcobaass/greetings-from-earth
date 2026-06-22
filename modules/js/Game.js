@@ -2,20 +2,50 @@ class PlaceTile {
     constructor(game, bga) {
         this.game = game;
         this.bga = bga;
+        this.tileSelected = null;
+        this.anchorX = null;
+        this.anchorY = null;
+        this.onGridClick = (event) => {
+            const cell = event.target;
+            if (!(cell instanceof HTMLElement) || !cell.classList.contains('gfe-cell'))
+                return;
+            this.anchorX = Number(cell.dataset.x);
+            this.anchorY = Number(cell.dataset.y);
+            if (isNaN(this.anchorX) || isNaN(this.anchorY))
+                return;
+            console.log('Tile clicked:', this.anchorX, this.anchorY);
+        };
     }
     onEnteringState(args, isCurrentPlayerActive) {
+        //loop over player ids
+        document.querySelectorAll('.gfe-dice-indicator').forEach(el => {
+            el.className = 'gfe-dice-indicator';
+            el.classList.add(`gfe-dice-${args.diceRoll}`);
+        });
         this.bga.statusBar.setTitle(isCurrentPlayerActive ?
             _('${you} must place your tile on the map') :
             _('Other players are placing their tile...'));
         if (isCurrentPlayerActive) {
             // TODO: show tile options and enable grid interaction
-            console.log('Tile options:', args.tileOptions, 'Dice roll:', args.diceRoll);
+            const playerId = this.bga.players.getCurrentPlayerId();
+            const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+            this.bga.statusBar.removeActionButtons();
+            args.tileOptions.forEach(tile => {
+                this.bga.statusBar.addActionButton(tile, () => {
+                    this.tileSelected = tile;
+                });
+            });
+            if (!grid)
+                return;
+            grid.removeEventListener('click', this.onGridClick);
+            grid.addEventListener('click', this.onGridClick);
         }
     }
     onLeavingState(args, isCurrentPlayerActive) {
         // TODO: clean up tile preview
     }
     onPlayerActivationChange(args, isCurrentPlayerActive) {
+        this.bga.statusBar.removeActionButtons;
         this.onEnteringState(args, isCurrentPlayerActive);
     }
 }
@@ -70,10 +100,23 @@ class Game {
             document.getElementById('gfe-player-boards').insertAdjacentHTML('beforeend', `
                 <div id="gfe-board-${playerId}" class="gfe-player-board">
                     <strong>${player.name}</strong>
-                    <div id="gfe-grid-${playerId}" class="gfe-grid"></div>
+                    <div id="gfe-sheet-${playerId}" class="gfe-sheet">
+                        <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
+                        <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
+                    </div>
                 </div>
             `);
-            // TODO: render the Berlin map grid for this player
+            // Set up player's play grid
+            const playGridEl = document.getElementById(`gfe-play-grid-${playerId}`);
+            if (playGridEl) {
+                let cellsHTML = '';
+                for (let y = 0; y < 13; y++) {
+                    for (let x = 0; x < 18; x++) {
+                        cellsHTML += `<div class="gfe-cell" data-x="${x}" data-y="${y}"></div>`;
+                    }
+                }
+                playGridEl.innerHTML = cellsHTML;
+            }
         });
         this.setupNotifications();
         console.log('Ending game setup');

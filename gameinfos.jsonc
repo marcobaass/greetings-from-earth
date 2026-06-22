@@ -16,11 +16,11 @@
 
     // Board Game Geek ID of the publisher
     // TODO: Add the BGG ID for publishers when available
-    "publisher_bgg_id": 0,
+    "publisher_bgg_id": 63077,
 
     // Board game geek ID of the game
     // TODO: Add the BGG ID for the game when available
-    "bgg_id": 0,
+    "bgg_id": 471861,
 
     // Designer(s)
     "game_designer": "Benno Thönelt, Marco Baaß",
