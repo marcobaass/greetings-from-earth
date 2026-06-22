@@ -128,3 +128,8 @@
     left: 77.4%;
     transform: rotate(120deg);
 }
+
+.gfe-cell-preview {
+    background: rgba(0, 128, 0, 0.25);
+    border: 3px solid black;
+}

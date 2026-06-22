@@ -25,12 +25,12 @@ How to get:
 ## Phase 1 — Dumb submit (smoke test)
 
 - [x] Grid click on own board reads `data-x` / `data-y` as anchor
-- [ ] Guard grid click if `tileSelected` is null
-- [ ] Call `performAction('actPlaceTile', …)` with rot 0, mirror false
-- [ ] Fix `removeActionButtons()` in `onPlayerActivationChange`
-- [ ] `Game::placeTile()` stub: insert cells into `player_cells` (no validation yet)
+- [x] Guard grid click if `tileSelected` is null
+- [x] Call `performAction('actPlaceTile', …)` with rot 0, mirror false
+- [x] Fix `removeActionButtons()` in `onPlayerActivationChange`
 - [ ] `notif_tilePlaced`: highlight covered cells on the correct board
 - [ ] Build TS, SFTP sync, test full click → server → notification in training mode
+- [ ] `Game::placeTile()` stub: insert cells into `player_cells` (no validation yet)
 
 ---
 
@@ -117,4 +117,4 @@ How to get:
 
 ## Current step
 
-**Next:** Phase 1 — grid click on own board + `performAction` smoke test
+**Next:** Phase 1 — `performAction('actPlaceTile', …)` smoke test

@@ -1,15 +1,47 @@
 import { Game } from "../Game";
+import { getShapeCells } from "../tiles";
 
 export class PlaceTile {
     private tileSelected: string | null = null;
     private anchorX: number | null = null;
     private anchorY: number | null = null;
+
     private onGridClick = (event: MouseEvent) => { const cell = event.target as HTMLElement;
+        if(!this.tileSelected) return;
         if(!(cell instanceof HTMLElement) || !cell.classList.contains('gfe-cell')) return;
         this.anchorX = Number(cell.dataset.x);
         this.anchorY = Number(cell.dataset.y);
+
+        const playerId = this.bga.players.getCurrentPlayerId();
+        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        if(!grid) return;
+
         if (isNaN(this.anchorX) || isNaN(this.anchorY)) return;
-        console.log('Tile clicked:', this.anchorX, this.anchorY); }
+
+        const shapeCells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, 0, false);
+
+        grid.querySelectorAll('.gfe-cell-preview').forEach(el => {
+            el.classList.remove('gfe-cell-preview');
+        })
+
+        shapeCells.forEach(([x, y]) => {
+            const cellElement = grid.querySelector(
+                `.gfe-cell[data-x="${x}"][data-y="${y}"]`
+            );
+            if (cellElement) {
+                cellElement.classList.add('gfe-cell-preview');
+            }
+        });
+
+        // this.bga.actions.performAction('actPlaceTile', {
+        //     activePlayerId: this.bga.players.getCurrentPlayerId(),
+        //     tileType: this.tileSelected,
+        //     x: this.anchorX,
+        //     y: this.anchorY,
+        //     rotation: 0,
+        //     mirror: false,
+        // }) 
+    }
 
     constructor(
         private game: Game,
@@ -54,7 +86,7 @@ export class PlaceTile {
     }
     
     onPlayerActivationChange(args: PlaceTileArgs, isCurrentPlayerActive: boolean) {
-        this.bga.statusBar.removeActionButtons;
+        this.bga.statusBar.removeActionButtons();
         this.onEnteringState(args, isCurrentPlayerActive);
     }
 }
