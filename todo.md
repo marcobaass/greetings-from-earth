@@ -28,17 +28,18 @@ How to get:
 - [x] Guard grid click if `tileSelected` is null
 - [x] Call `performAction('actPlaceTile', …)` with rot 0, mirror false
 - [x] Fix `removeActionButtons()` in `onPlayerActivationChange`
-- [ ] `notif_tilePlaced`: highlight covered cells on the correct board
-- [ ] Build TS, SFTP sync, test full click → server → notification in training mode
-- [ ] `Game::placeTile()` stub: insert cells into `player_cells` (no validation yet)
+- [x] `notif_tilePlaced`: highlight covered cells on the correct board
+- [x] Build TS, SFTP sync, test full click → server → notification in training mode
+- [x] `Game::placeTile()` stub: insert cells into `player_cells` (no validation yet)
 
 ---
 
 ## Phase 2 — Shape math (client)
 
-- [ ] Port `TILE_SHAPES` to `src/ts/tiles.ts` (or shared constants module)
-- [ ] `applyRotation(offsets, rotation)` — 0/90/180/270
+- [x] Port `TILE_SHAPES` to `src/ts/tiles.ts` (or shared constants module)
+- [x] `applyRotation(offsets, rotation)` — 0/90/180/270
 - [ ] `applyMirror(offsets, mirror)` — flip horizontally
+- [ ] implement check so tile always sits on grid after rotating or mirroring
 - [ ] `getShapeCells(tileType, anchorX, anchorY, rotation, mirror)` → `{x,y}[]`
 - [ ] Mirror same helpers in PHP (`constants.inc.php` or `Game.php`)
 

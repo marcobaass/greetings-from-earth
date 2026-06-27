@@ -8,16 +8,69 @@ const TILE_SHAPES = {
     SZ4: [[0, 0], [1, 0], [1, 1], [2, 1]],
     L5: [[0, 0], [0, 1], [0, 2], [0, 3], [1, 3]],
 };
+// Order: rotate, then mirror — must match PHP
 function getShapeCells(tileType, anchorX, anchorY, rotation = 0, mirror = false) {
-    if (!tileType)
-        return;
-    const shape = TILE_SHAPES[tileType];
-    if (!tileType || !shape)
+    if (!tileType || !TILE_SHAPES[tileType])
         return [];
-    return shape.map(([dx, dy]) => [anchorX + dx, anchorY + dy]);
+    const shape = TILE_SHAPES[tileType];
+    let rotated = applyRotation(shape, rotation);
+    if (mirror) {
+        rotated = applyMirror(rotated);
+    }
+    return rotated.map(([dx, dy]) => [anchorX + dx, anchorY + dy]);
+}
+function applyRotation(offsets, rotation = 0) {
+    return offsets.map(([dx, dy]) => {
+        let newX = dx;
+        let newY = dy;
+        switch (rotation) {
+            case 0:
+                break;
+            case 90:
+                newX = -dy;
+                newY = dx;
+                break;
+            case 180:
+                newX = -dx;
+                newY = -dy;
+                break;
+            case 270:
+                newX = dy;
+                newY = -dx;
+                break;
+            default:
+                break;
+        }
+        return [newX, newY];
+    });
+}
+function applyMirror(offsets) {
+    return offsets.map(([dx, dy]) => [-dx, dy]);
 }
 
 class PlaceTile {
+    cleanUpPreview(grid) {
+        grid.querySelectorAll('.gfe-cell-preview').forEach(el => {
+            el.classList.remove('gfe-cell-preview');
+        });
+    }
+    /**
+     * Shows a preview of the tile on the grid
+     * @param grid The grid element to show the preview on
+     * @param tileType The type of tile to show the preview for
+     * @param anchorX The x coordinate of the anchor point
+     * @param anchorY The y coordinate of the anchor point
+    */
+    showPreview(grid, tileType, anchorX, anchorY) {
+        const shapeCells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
+        this.cleanUpPreview(grid);
+        shapeCells.forEach(([x, y]) => {
+            const cellElement = grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`);
+            if (cellElement) {
+                cellElement.classList.add('gfe-cell-preview');
+            }
+        });
+    }
     constructor(game, bga) {
         this.game = game;
         this.bga = bga;
@@ -30,24 +83,15 @@ class PlaceTile {
                 return;
             if (!(cell instanceof HTMLElement) || !cell.classList.contains('gfe-cell'))
                 return;
-            this.anchorX = Number(cell.dataset.x);
-            this.anchorY = Number(cell.dataset.y);
             const playerId = this.bga.players.getCurrentPlayerId();
             const grid = document.getElementById(`gfe-play-grid-${playerId}`);
             if (!grid)
                 return;
+            this.anchorX = Number(cell.dataset.x);
+            this.anchorY = Number(cell.dataset.y);
             if (isNaN(this.anchorX) || isNaN(this.anchorY))
                 return;
-            const shapeCells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, 0, false);
-            grid.querySelectorAll('.gfe-cell-preview').forEach(el => {
-                el.classList.remove('gfe-cell-preview');
-            });
-            shapeCells.forEach(([x, y]) => {
-                const cellElement = grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`);
-                if (cellElement) {
-                    cellElement.classList.add('gfe-cell-preview');
-                }
-            });
+            this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
             // this.bga.actions.performAction('actPlaceTile', {
             //     activePlayerId: this.bga.players.getCurrentPlayerId(),
             //     tileType: this.tileSelected,
@@ -57,6 +101,8 @@ class PlaceTile {
             //     mirror: false,
             // }) 
         };
+        this.rotation = 0;
+        this.mirror = false;
     }
     onEnteringState(args, isCurrentPlayerActive) {
         //loop over player ids
@@ -72,19 +118,58 @@ class PlaceTile {
             const playerId = this.bga.players.getCurrentPlayerId();
             const grid = document.getElementById(`gfe-play-grid-${playerId}`);
             this.bga.statusBar.removeActionButtons();
+            if (!grid)
+                return;
             args.tileOptions.forEach(tile => {
                 this.bga.statusBar.addActionButton(tile, () => {
                     this.tileSelected = tile;
+                    this.anchorX = 0;
+                    this.anchorY = 0;
+                    this.rotation = 0;
+                    this.mirror = false;
+                    this.showPreview(grid, tile, 0, 0);
                 });
             });
-            if (!grid)
-                return;
+            this.bga.statusBar.addActionButton('↻', () => {
+                if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
+                    return;
+                if (this.mirror) {
+                    this.rotation += 180;
+                }
+                this.rotation = (this.rotation + 90) % 360;
+                this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+            });
+            this.bga.statusBar.addActionButton('↺', () => {
+                if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
+                    return;
+                if (this.mirror) {
+                    this.rotation += 180;
+                }
+                this.rotation = (this.rotation + 270) % 360;
+                this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+            });
+            this.bga.statusBar.addActionButton('↔', () => {
+                if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
+                    return;
+                this.mirror = !this.mirror;
+                this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+            });
             grid.removeEventListener('click', this.onGridClick);
             grid.addEventListener('click', this.onGridClick);
         }
     }
     onLeavingState(args, isCurrentPlayerActive) {
-        // TODO: clean up tile preview
+        const playerId = this.bga.players.getCurrentPlayerId();
+        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        if (!grid)
+            return;
+        this.cleanUpPreview(grid);
+        grid.removeEventListener('click', this.onGridClick);
+        this.tileSelected = null;
+        this.anchorX = null;
+        this.anchorY = null;
+        this.rotation = 0;
+        this.mirror = false;
     }
     onPlayerActivationChange(args, isCurrentPlayerActive) {
         this.bga.statusBar.removeActionButtons();
