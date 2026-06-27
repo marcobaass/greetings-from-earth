@@ -1,5 +1,5 @@
 import { Game } from "../Game";
-import { getShapeCells } from "../tiles";
+import { computeTileShift, getShapeCells, isInsideGrid } from "../tiles";
 
 export class PlaceTile {
     private tileSelected: string | null = null;
@@ -45,11 +45,21 @@ export class PlaceTile {
      * @param anchorY The y coordinate of the anchor point
     */
    private showPreview(grid: HTMLElement, tileType: string, anchorX: number, anchorY: number) {
-        const shapeCells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
-    
+        let cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
+
+        if(!isInsideGrid(cells)) {
+            const [shiftX, shiftY] = computeTileShift(cells);
+            anchorX += shiftX;
+            anchorY += shiftY;
+            cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
+        };
+        
+        this.anchorX = anchorX;
+        this.anchorY = anchorY;
+        
         this.cleanUpPreview(grid);
     
-        shapeCells.forEach(([x, y]) => {
+        cells.forEach(([x, y]) => {
             const cellElement = grid.querySelector(
                 `.gfe-cell[data-x="${x}"][data-y="${y}"]`
             );
@@ -101,18 +111,14 @@ export class PlaceTile {
 
             this.bga.statusBar.addActionButton('↻', () => {
                 if(!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-                if (this.mirror) {
-                    this.rotation += 180;
-                }
+
                 this.rotation = (this.rotation + 90) % 360;
                 this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
             });
 
             this.bga.statusBar.addActionButton('↺', () => {
                 if(!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-                if (this.mirror) {
-                    this.rotation += 180;
-                }
+
                 this.rotation = (this.rotation + 270) % 360;
                 this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
             });

@@ -1,121 +1,59 @@
-How to get:
-  - player id = this.bga.players.getCurrentPlayerId()
-
-
-
 # Greetings from Earth — TODO
 
-`- [ ]` not started · `- [~]` in progress · `- [x]` done
+`- [ ]` not started · `- [x]` done
 
 ---
 
-## Phase 0 — Foundation (done)
+## Done — Foundation & placement preview
 
 - [x] BGA project, SFTP, TypeScript build pipeline
-- [x] `TILE_SHAPES`, `BERLIN_MAP`, `DICE_WHEEL` in `constants.inc.php`
-- [x] DB tables `player_cells`, `player_state`
-- [x] States: `NewRound` → `PlaceTile` (multiactive) → `PlaceBonus` → `EndScore`
-- [x] Client boards: Berlin map, 18×13 grid, dice wheel overlay per player
-- [x] `PlaceTile`: dice frame update from `args.diceRoll`
-- [x] `PlaceTile`: status bar buttons from `args.tileOptions`
-- [x] `PlaceTile`: store selected tile in `tileSelected`
+- [x] Server: `TILE_SHAPES`, `BERLIN_MAP`, `DICE_WHEEL`, states, DB tables
+- [x] Client boards: map, 18×13 grid, dice wheel per player
+- [x] `PlaceTile`: tile buttons, `tileSelected`, grid click → anchor
+- [x] `tiles.ts`: `getShapeCells`, `applyRotation`, `applyMirror`, `effectiveRotation`
+- [x] CSS cell preview (`showPreview` / `cleanUpPreview`)
+- [x] Preview at (0,0) on tile select; move on grid click
+- [x] Rotate ↻ / ↺ and mirror ↔ (status bar)
+- [x] Auto-slide off-grid tiles (`isInsideGrid`, `computeTileShift`)
+- [x] `onLeavingState` cleanup; `removeActionButtons()`; no duplicate listeners
 
 ---
 
-## Phase 1 — Dumb submit (smoke test)
+## Next — Confirm & server smoke test
 
-- [x] Grid click on own board reads `data-x` / `data-y` as anchor
-- [x] Guard grid click if `tileSelected` is null
-- [x] Call `performAction('actPlaceTile', …)` with rot 0, mirror false
-- [x] Fix `removeActionButtons()` in `onPlayerActivationChange`
-- [x] `notif_tilePlaced`: highlight covered cells on the correct board
-- [x] Build TS, SFTP sync, test full click → server → notification in training mode
-- [x] `Game::placeTile()` stub: insert cells into `player_cells` (no validation yet)
+- [ ] Add Confirm button (grid does not submit)
+- [ ] Confirm → `performAction('actPlaceTile', { activePlayerId, tileType, x, y, rotation, mirror })`
+- [ ] `Game::placeTile()` stub: insert into `player_cells` (no validation yet)
+- [ ] `notif_tilePlaced`: highlight cells on correct board
+- [ ] Build → SFTP → test full flow in training mode
 
 ---
 
-## Phase 2 — Shape math (client)
+## Later — validation & polish
 
-- [x] Port `TILE_SHAPES` to `src/ts/tiles.ts` (or shared constants module)
-- [x] `applyRotation(offsets, rotation)` — 0/90/180/270
-- [ ] `applyMirror(offsets, mirror)` — flip horizontally
-- [ ] implement check so tile always sits on grid after rotating or mirroring
-- [ ] `getShapeCells(tileType, anchorX, anchorY, rotation, mirror)` → `{x,y}[]`
-- [ ] Mirror same helpers in PHP (`constants.inc.php` or `Game.php`)
-
----
-
-## Phase 3 — Placement draft object
-
-- [ ] Define `PlacementDraft` type: tileType, anchor, rotation, mirror, coveredCells, isValid
-- [ ] `recomputeDraft(draft)` updates coveredCells from shape math
-- [ ] Recompute draft on tile select, grid click, rotate, mirror
-- [ ] Reset draft when entering / leaving `PlaceTile`
+- [ ] Port rotation/mirror helpers to PHP (same order: rotate → mirror, `effectiveRotation` rule)
+- [ ] Client validation: overlap, rivers, monuments, S-Bahn, adjacency
+- [ ] Green/red preview OR disable Confirm when invalid
+- [ ] `onPlayerActivationChange(false)`: cleanup when deactivated after submit
+- [ ] `setup()`: render `gamedatas.coveredCells` on F5 reload
 
 ---
 
-## Phase 4 — Client validation (preview feedback)
+## Later — SVG & UX
 
-- [ ] Port `BERLIN_MAP` cell types to client
-- [ ] Check all shape cells are inside 18×13 bounds
-- [ ] Check no overlap with `gamedatas.coveredCells` and already-rendered tiles
-- [ ] Check no cell covers river, monument, or S-Bahn
-- [ ] Check adjacency to last tile (or S-Bahn for first placement)
-- [ ] Set `draft.isValid` and optional invalid reason for UI
+- [ ] SVG preview overlay (replace or layer on CSS cells)
+- [ ] Optional: ring controls on board (Ark Nova style)
+- [ ] Optional: keyboard R / M / Enter
 
 ---
 
-## Phase 5 — SVG preview (anchor = top-left)
+## Later — game logic
 
-- [ ] Add preview container overlay on `gfe-sheet` (absolute, same scale as grid)
-- [ ] Load / inline SVG per tile type (`I4`, `U5`, `L4`, `T4`, `SZ4`, `L5`)
-- [ ] Position preview so anchor cell `(0,0)` aligns with `draft.anchor` on grid
-- [ ] Move preview when player clicks a new grid cell
-- [ ] Update preview transform on rotate / mirror
-- [ ] Tint preview green when valid, red when invalid
-
----
-
-## Phase 6 — Transform & confirm controls
-
-- [ ] Grid click moves preview only — does not submit
-- [ ] Add Rotate left / Rotate right buttons (update `draft.rotation`)
-- [ ] Add Mirror button (toggle `draft.mirror`)
-- [ ] Add Confirm button — enabled only when `draft.isValid`
-- [ ] Confirm calls `performAction('actPlaceTile', …)` with full draft params
-- [ ] Optional: keyboard shortcuts R / M / Enter
-- [ ] Optional: Ark Nova-style ring around shape with buttons on ring
-
----
-
-## Phase 7 — Cleanup & polish
-
-- [ ] `onLeavingState`: remove grid listener, hide preview, clear draft
-- [ ] `onLeavingState`: `removeActionButtons()`
-- [ ] Prevent duplicate listeners when re-entering state
-- [ ] Non-active players: no grid interaction, only watch notifications
-- [ ] `setup()`: render existing `coveredCells` from `gamedatas` on F5 reload
-
----
-
-## Phase 8 — Server validation (match client rules)
-
-- [ ] `Game::isValidPlacement()` — bounds, overlap, non-coverable cells, adjacency
-- [ ] `Game::placeTile()` calls `isValidPlacement()` before DB insert
-- [ ] Update `player_state.last_x` / `last_y` after placement
-- [ ] Reject invalid `actPlaceTile` with `UserException`
-
----
-
-## Phase 9 — After placement works
-
-- [ ] `checkCollectibles()` on newly covered cells
-- [ ] `PlaceBonus` client UI (reuse draft + preview flow)
-- [ ] Scoring panel and end-game scoring
-- [ ] Additional maps (Paris, London, New York)
+- [ ] `Game::isValidPlacement()` + reject with `UserException`
+- [ ] `checkCollectibles()`, `PlaceBonus` UI, scoring, more maps
 
 ---
 
 ## Current step
 
-**Next:** Phase 1 — `performAction('actPlaceTile', …)` smoke test
+**Next:** Confirm button + `performAction` (no full validation yet)

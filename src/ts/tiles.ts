@@ -13,11 +13,13 @@ export const TILE_SHAPES: Record<string, [number, number][]> = {
 export function getShapeCells(tileType: string, anchorX: number, anchorY: number, rotation: number = 0, mirror: boolean = false): [number, number][] {
     if(!tileType || !TILE_SHAPES[tileType]) return [];
     const shape = TILE_SHAPES[tileType];
-    let rotated = applyRotation(shape, rotation);
-    if(mirror) {
-        rotated = applyMirror(rotated);
-    }
-    return rotated.map(([dx, dy]) => [anchorX + dx, anchorY + dy]);
+
+    const effectiveRotation = mirror ? (360 - rotation) % 360 : rotation;
+    
+    const rotated = applyRotation(shape, effectiveRotation);
+    const mirrored = mirror ? applyMirror(rotated) : rotated;
+
+    return mirrored.map(([dx, dy]) => [anchorX + dx, anchorY + dy]);
 }
 
 function applyRotation(offsets: [number, number][], rotation: number = 0): [number, number][] {
@@ -49,4 +51,24 @@ function applyRotation(offsets: [number, number][], rotation: number = 0): [numb
 
 function applyMirror(offsets: [number, number][]): [number, number][] {
     return offsets.map(([dx, dy]) => [-dx, dy]);
+}
+
+export function isInsideGrid(cells: [number, number][]): boolean {
+    return cells.every(([x, y]) => x >= 0 && x <= 17 && y >= 0 && y <= 12);
+}
+
+export function computeTileShift(cells: [number, number][]): [number, number] {
+    const xs = cells.map(([x]) => x);
+    const ys = cells.map(([, y]) => y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    
+    let shiftX = 0;
+    let shiftY = 0;
+    if (minX < 0) shiftX = -minX;
+    else if (maxX > 17) shiftX = 17 - maxX;
+    if (minY < 0) shiftY = -minY;
+    else if (maxY > 12) shiftY = 12 - maxY;
+    
+    return [shiftX, shiftY];
 }

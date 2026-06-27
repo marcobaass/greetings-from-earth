@@ -13,11 +13,10 @@ function getShapeCells(tileType, anchorX, anchorY, rotation = 0, mirror = false)
     if (!tileType || !TILE_SHAPES[tileType])
         return [];
     const shape = TILE_SHAPES[tileType];
-    let rotated = applyRotation(shape, rotation);
-    if (mirror) {
-        rotated = applyMirror(rotated);
-    }
-    return rotated.map(([dx, dy]) => [anchorX + dx, anchorY + dy]);
+    const effectiveRotation = mirror ? (360 - rotation) % 360 : rotation;
+    const rotated = applyRotation(shape, effectiveRotation);
+    const mirrored = mirror ? applyMirror(rotated) : rotated;
+    return mirrored.map(([dx, dy]) => [anchorX + dx, anchorY + dy]);
 }
 function applyRotation(offsets, rotation = 0) {
     return offsets.map(([dx, dy]) => {
@@ -47,6 +46,26 @@ function applyRotation(offsets, rotation = 0) {
 function applyMirror(offsets) {
     return offsets.map(([dx, dy]) => [-dx, dy]);
 }
+function isInsideGrid(cells) {
+    return cells.every(([x, y]) => x >= 0 && x <= 17 && y >= 0 && y <= 12);
+}
+function computeTileShift(cells) {
+    const xs = cells.map(([x]) => x);
+    const ys = cells.map(([, y]) => y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    let shiftX = 0;
+    let shiftY = 0;
+    if (minX < 0)
+        shiftX = -minX;
+    else if (maxX > 17)
+        shiftX = 17 - maxX;
+    if (minY < 0)
+        shiftY = -minY;
+    else if (maxY > 12)
+        shiftY = 12 - maxY;
+    return [shiftX, shiftY];
+}
 
 class PlaceTile {
     cleanUpPreview(grid) {
@@ -62,9 +81,18 @@ class PlaceTile {
      * @param anchorY The y coordinate of the anchor point
     */
     showPreview(grid, tileType, anchorX, anchorY) {
-        const shapeCells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
+        let cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
+        if (!isInsideGrid(cells)) {
+            const [shiftX, shiftY] = computeTileShift(cells);
+            anchorX += shiftX;
+            anchorY += shiftY;
+            cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
+        }
+        ;
+        this.anchorX = anchorX;
+        this.anchorY = anchorY;
         this.cleanUpPreview(grid);
-        shapeCells.forEach(([x, y]) => {
+        cells.forEach(([x, y]) => {
             const cellElement = grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`);
             if (cellElement) {
                 cellElement.classList.add('gfe-cell-preview');
@@ -133,18 +161,12 @@ class PlaceTile {
             this.bga.statusBar.addActionButton('↻', () => {
                 if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
                     return;
-                if (this.mirror) {
-                    this.rotation += 180;
-                }
                 this.rotation = (this.rotation + 90) % 360;
                 this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
             });
             this.bga.statusBar.addActionButton('↺', () => {
                 if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
                     return;
-                if (this.mirror) {
-                    this.rotation += 180;
-                }
                 this.rotation = (this.rotation + 270) % 360;
                 this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
             });
