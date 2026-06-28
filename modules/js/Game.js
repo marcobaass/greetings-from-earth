@@ -176,6 +176,18 @@ class PlaceTile {
                 this.mirror = !this.mirror;
                 this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
             });
+            this.bga.statusBar.addActionButton('✔', () => {
+                if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
+                    return;
+                this.bga.actions.performAction('actPlaceTile', {
+                    activePlayerId: this.bga.players.getCurrentPlayerId(),
+                    tileType: this.tileSelected,
+                    x: this.anchorX,
+                    y: this.anchorY,
+                    rotation: this.rotation,
+                    mirror: this.mirror,
+                });
+            });
             grid.removeEventListener('click', this.onGridClick);
             grid.addEventListener('click', this.onGridClick);
         }

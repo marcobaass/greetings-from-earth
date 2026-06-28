@@ -16,6 +16,7 @@
 - [x] Rotate ↻ / ↺ and mirror ↔ (status bar)
 - [x] Auto-slide off-grid tiles (`isInsideGrid`, `computeTileShift`)
 - [x] `onLeavingState` cleanup; `removeActionButtons()`; no duplicate listeners
+- [ ] add adittional tiles wit hone and with two squares players can choose from        alternative to the once decided bythe dice
 
 ---
 

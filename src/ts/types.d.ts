@@ -10,6 +10,9 @@ interface GreetingsFromEarthGamedatas extends Gamedatas<GreetingsFromEarthPlayer
         player_id: number;
         last_x: number | null;
         last_y: number | null;
+        last_tile_type: string | null;
+        last_rotation: number;
+        last_mirror: number;
         has_started: number;
         currywurst_count: number;
         escooter_count: number;
