@@ -16,32 +16,58 @@
 - [x] Rotate ↻ / ↺ and mirror ↔ (status bar)
 - [x] Auto-slide off-grid tiles (`isInsideGrid`, `computeTileShift`)
 - [x] `onLeavingState` cleanup; `removeActionButtons()`; no duplicate listeners
-- [ ] add adittional tiles wit hone and with two squares players can choose from        alternative to the once decided bythe dice
+- [x] `dbmodel.sql`: `last_tile_type`, `last_rotation`, `last_mirror`
+- [x] `types.d.ts`: `coveredCells`, `playerState` (single file in `src/ts/`)
+- [x] `map.ts`: `BERLIN_MAP`, `getCellType`, `getSbahnCellSet`, `cellKey`
+- [x] `placement.ts`: overlap, adjacency, `isPlacementLegal`
+- [x] `PlaceTile`: `updateActionButtons`, ✔ only when legal
+- [x] `placeTileArgs` on class; gamedatas via `this.bga.gameui.gamedatas`
 
 ---
 
-## Next — Confirm & server smoke test
+## Next — server smoke test
 
-- [ ] Add Confirm button (grid does not submit)
-- [ ] Confirm → `performAction('actPlaceTile', { activePlayerId, tileType, x, y, rotation, mirror })`
-- [ ] `Game::placeTile()` stub: insert into `player_cells` (no validation yet)
-- [ ] `notif_tilePlaced`: highlight cells on correct board
-- [ ] Build → SFTP → test full flow in training mode
+- [ ] `Game::placeTile()`: insert into `player_cells`, update `player_state`
+- [ ] `notif_tilePlaced`: render cells + update client `gamedatas.coveredCells`
+- [ ] `Game::isValidPlacement()` on server (mirror client rules)
+- [ ] Build → SFTP → test: pick tile → place next to S-Bahn → ✔ → submit
+
+**Note:** ✔ only appears when placement is legal. First tile must be **orthogonally adjacent** to an S-Bahn cell: `(8,0)`, `(0,5)`, `(17,5)`, `(8,12)`. Preview at `(0,0)` is usually invalid — expected.
+
+---
+
+## Next — tile choice (core rule, from game start)
+
+Each round the dice offers 2 polyomino options (`tileOptions`). Players may instead choose:
+
+- [ ] **1-square tile** (alternative to dice options)
+- [ ] **2-square tile** (alternative to dice options)
+
+**Server**
+
+- [ ] Extend `PlaceTile` / `NewRound` args: send 1- and 2-square types alongside dice pair
+- [ ] Add shapes to `TILE_SHAPES` / constants if needed (single cell, domino)
+- [ ] `actPlaceTile` accepts these types like any other tile
+
+**Client**
+
+- [ ] `updateActionButtons`: show 1- and 2-square buttons with dice options
+- [ ] Preview, validation, and confirm work for small tiles
 
 ---
 
 ## Later — validation & polish
 
 - [ ] Port rotation/mirror helpers to PHP (same order: rotate → mirror, `effectiveRotation` rule)
-- [ ] Client validation: overlap, rivers, monuments, S-Bahn, adjacency
-- [ ] Green/red preview OR disable Confirm when invalid
+- [ ] Green/red preview when invalid (optional; auto-slide stays)
 - [ ] `onPlayerActivationChange(false)`: cleanup when deactivated after submit
 - [ ] `setup()`: render `gamedatas.coveredCells` on F5 reload
 
 ---
 
-## Later — SVG & UX
+## Later — placement UX
 
+- [ ] Valid-placement hint: highlight where a tile may legally touch (S-Bahn on first turn; last tile + S-Bahn later)
 - [ ] SVG preview overlay (replace or layer on CSS cells)
 - [ ] Optional: ring controls on board (Ark Nova style)
 - [ ] Optional: keyboard R / M / Enter
@@ -50,11 +76,11 @@
 
 ## Later — game logic
 
-- [ ] `Game::isValidPlacement()` + reject with `UserException`
-- [ ] `checkCollectibles()`, `PlaceBonus` UI, scoring, more maps
+- [ ] `checkCollectibles()`, `PlaceBonus` UI, scoring
+- [ ] More maps / content
 
 ---
 
 ## Current step
 
-**Next:** Confirm button + `performAction` (no full validation yet)
+**Next:** `Game::placeTile()` + `notif_tilePlaced` — end-to-end submit and persist cells. Then **1- and 2-square tile choice** (core rule every round).

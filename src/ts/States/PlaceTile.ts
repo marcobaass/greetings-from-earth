@@ -1,8 +1,10 @@
 import { Game } from "../Game";
+import { isPlacementLegal } from "../placement";
 import { computeTileShift, getShapeCells, isInsideGrid } from "../tiles";
 
 export class PlaceTile {
     private tileSelected: string | null = null;
+    private placeTileArgs: PlaceTileArgs | null = null;
     private anchorX: number | null = null;
     private anchorY: number | null = null;
 
@@ -17,15 +19,8 @@ export class PlaceTile {
 
         if (isNaN(this.anchorX) || isNaN(this.anchorY)) return;
 
-        this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);        
-        // this.bga.actions.performAction('actPlaceTile', {
-        //     activePlayerId: this.bga.players.getCurrentPlayerId(),
-        //     tileType: this.tileSelected,
-        //     x: this.anchorX,
-        //     y: this.anchorY,
-        //     rotation: 0,
-        //     mirror: false,
-        // }) 
+        this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);       
+
     }
     
     private cleanUpPreview(grid: HTMLElement) {
@@ -58,7 +53,7 @@ export class PlaceTile {
         this.anchorY = anchorY;
         
         this.cleanUpPreview(grid);
-    
+        
         cells.forEach(([x, y]) => {
             const cellElement = grid.querySelector(
                 `.gfe-cell[data-x="${x}"][data-y="${y}"]`
@@ -67,6 +62,66 @@ export class PlaceTile {
                 cellElement.classList.add('gfe-cell-preview');
             }
         });
+        
+        const legal = isPlacementLegal(cells, this.bga.gameui.gamedatas);
+
+        if (!this.placeTileArgs) return;
+
+        this.updateActionButtons(legal, grid)
+    }
+
+    private updateActionButtons(legal: boolean, grid: HTMLElement) {
+        this.bga.statusBar.removeActionButtons();
+
+        if (!this.placeTileArgs) return;
+
+        this.placeTileArgs.tileOptions.forEach(tile => {
+            this.bga.statusBar.addActionButton(tile, () => {
+                this.tileSelected = tile;
+                this.anchorX = 0;
+                this.anchorY = 0;
+                this.rotation = 0;
+                this.mirror = false;
+                this.showPreview(grid, tile, 0, 0);
+            });
+        });
+
+        this.bga.statusBar.addActionButton('↻', () => {
+            if(!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
+
+            this.rotation = (this.rotation + 90) % 360;
+            this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        });
+
+        this.bga.statusBar.addActionButton('↺', () => {
+            if(!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
+
+            this.rotation = (this.rotation + 270) % 360;
+            this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        });
+
+        this.bga.statusBar.addActionButton('↔', () => {
+            if(!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
+            this.mirror = !this.mirror;
+            this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        });
+
+        if (legal && this.tileSelected) {
+            this.bga.statusBar.addActionButton('✔', () => {
+                if(!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
+                const cells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
+                if(!isPlacementLegal(cells, this.bga.gameui.gamedatas)) return;
+
+                this.bga.actions.performAction('actPlaceTile', {
+                    activePlayerId: this.bga.players.getCurrentPlayerId(),
+                    tileType: this.tileSelected,
+                    x: this.anchorX,
+                    y: this.anchorY,
+                    rotation: this.rotation,
+                    mirror: this.mirror,
+                });
+            });
+        }
     }
 
 
@@ -76,6 +131,7 @@ export class PlaceTile {
     ) {}
     
     onEnteringState(args: PlaceTileArgs, isCurrentPlayerActive: boolean) {
+        this.placeTileArgs = args;
         
         //loop over player ids
         document.querySelectorAll('.gfe-dice-indicator').forEach(el => {
@@ -92,58 +148,15 @@ export class PlaceTile {
         if (isCurrentPlayerActive) {
             // TODO: show tile options and enable grid interaction
             const playerId = this.bga.players.getCurrentPlayerId();
-            const grid = document.getElementById(`gfe-play-grid-${playerId}`);        
-            
-            this.bga.statusBar.removeActionButtons();
+            const grid = document.getElementById(`gfe-play-grid-${playerId}`);  
 
             if (!grid) return;
 
-            args.tileOptions.forEach(tile => {
-                this.bga.statusBar.addActionButton(tile, () => {
-                    this.tileSelected = tile;
-                    this.anchorX = 0;
-                    this.anchorY = 0;
-                    this.rotation = 0;
-                    this.mirror = false;
-                    this.showPreview(grid, tile, 0, 0);
-                });
-            });
-
-            this.bga.statusBar.addActionButton('↻', () => {
-                if(!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-
-                this.rotation = (this.rotation + 90) % 360;
-                this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-            });
-
-            this.bga.statusBar.addActionButton('↺', () => {
-                if(!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-
-                this.rotation = (this.rotation + 270) % 360;
-                this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-            });
-
-            this.bga.statusBar.addActionButton('↔', () => {
-                if(!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-                this.mirror = !this.mirror;
-                this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-            });
-
-            this.bga.statusBar.addActionButton('✔', () => {
-                if(!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-                this.bga.actions.performAction('actPlaceTile', {
-                    activePlayerId: this.bga.players.getCurrentPlayerId(),
-                    tileType: this.tileSelected,
-                    x: this.anchorX,
-                    y: this.anchorY,
-                    rotation: this.rotation,
-                    mirror: this.mirror,
-                });
-            });
-
             grid.removeEventListener('click', this.onGridClick);
             grid.addEventListener('click', this.onGridClick);
+            this.updateActionButtons(false, grid);
         }
+
     }
 
     onLeavingState(args: PlaceTileArgs, isCurrentPlayerActive: boolean) {
@@ -158,6 +171,7 @@ export class PlaceTile {
         this.anchorY = null;
         this.rotation = 0;
         this.mirror = false;
+        this.placeTileArgs = null;
     }
     
     onPlayerActivationChange(args: PlaceTileArgs, isCurrentPlayerActive: boolean) {
