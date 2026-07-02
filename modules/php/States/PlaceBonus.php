@@ -39,7 +39,7 @@ class PlaceBonus extends GameState
      */
     #[PossibleAction]
     public function actPlaceBonusTile(
-        int    $activePlayerId,
+        int    $currentPlayerId,
         string $tileType,
         int    $x,
         int    $y,
@@ -47,18 +47,18 @@ class PlaceBonus extends GameState
         bool   $mirror,
     ): string|null {
         // Validate that this tile is actually pending for this player
-        $pendingTiles = $this->game->getPendingBonusTiles($activePlayerId);
+        $pendingTiles = $this->game->getPendingBonusTiles($currentPlayerId);
         if (!in_array($tileType, $pendingTiles)) {
             throw new UserException('Invalid bonus tile choice');
         }
 
         // Place it
-        $this->game->placeBonusTile($activePlayerId, $tileType, $x, $y, $rotation, $mirror);
+        $this->game->placeBonusTile($currentPlayerId, $tileType, $x, $y, $rotation, $mirror);
 
         // Notify all players
         $this->notify->all('bonusTilePlaced', clienttranslate('${player_name} places a bonus ${tile_type} tile'), [
-            'player_id'   => $activePlayerId,
-            'player_name' => $this->game->getPlayerNameById($activePlayerId),
+            'player_id'   => $currentPlayerId,
+            'player_name' => $this->game->getPlayerNameById($currentPlayerId),
             'tile_type'   => $tileType,
             'x'           => $x,
             'y'           => $y,
@@ -67,12 +67,12 @@ class PlaceBonus extends GameState
         ]);
 
         // If this player still has more pending tiles, stay in this state
-        if ($this->game->hasPendingBonusTiles($activePlayerId)) {
+        if ($this->game->hasPendingBonusTiles($currentPlayerId)) {
             return null;
         }
 
         // No more pending tiles — mark player as done
-        $this->gamestate->setPlayerNonMultiactive($activePlayerId, NewRound::class);
+        $this->gamestate->setPlayerNonMultiactive($currentPlayerId, NewRound::class);
         return null;
     }
 

@@ -133,3 +133,8 @@
     background: rgba(0, 128, 0, 0.25);
     border: 3px solid black;
 }
+
+.gfe-cell-placed {
+    background: rgba(80, 120, 200, 0.6);
+    border: 1px solid #333;
+}

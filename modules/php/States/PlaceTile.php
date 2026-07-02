@@ -45,7 +45,7 @@ class PlaceTile extends GameState
      */
     #[PossibleAction]
     public function actPlaceTile(
-        int    $activePlayerId,
+        int    $currentPlayerId,
         string $tileType,
         int    $x,
         int    $y,
@@ -58,11 +58,11 @@ class PlaceTile extends GameState
             throw new UserException('Invalid tile choice');
         }
     
-        $this->game->placeTile($activePlayerId, $tileType, $x, $y, $rotation, $mirror);
+        $this->game->placeTile($currentPlayerId, $tileType, $x, $y, $rotation, $mirror);
     
         $this->notify->all('tilePlaced', clienttranslate('${player_name} places a ${tile_type} tile'), [
-            'player_id'   => $activePlayerId,
-            'player_name' => $this->game->getPlayerNameById($activePlayerId),
+            'player_id'   => $currentPlayerId,
+            'player_name' => $this->game->getPlayerNameById($currentPlayerId),
             'tile_type'   => $tileType,
             'x'           => $x,
             'y'           => $y,
@@ -71,11 +71,11 @@ class PlaceTile extends GameState
         ]);
     
         // Check bonus tiles BEFORE deactivating
-        $nextState = $this->game->hasPendingBonusTiles($activePlayerId)
+        $nextState = $this->game->hasPendingBonusTiles($currentPlayerId)
             ? PlaceBonus::class
             : NewRound::class;
     
-        $this->gamestate->setPlayerNonMultiactive($activePlayerId, $nextState);
+        $this->gamestate->setPlayerNonMultiactive($currentPlayerId, $nextState);
         return null;
     }
     

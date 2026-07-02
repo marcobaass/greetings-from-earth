@@ -233,7 +233,6 @@ class PlaceTile {
                 if (!isPlacementLegal(cells, this.bga.gameui.gamedatas))
                     return;
                 this.bga.actions.performAction('actPlaceTile', {
-                    activePlayerId: this.bga.players.getCurrentPlayerId(),
                     tileType: this.tileSelected,
                     x: this.anchorX,
                     y: this.anchorY,
@@ -283,7 +282,6 @@ class PlaceTile {
             // TODO: show tile options and enable grid interaction
             const playerId = this.bga.players.getCurrentPlayerId();
             const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-            this.bga.statusBar.removeActionButtons();
             if (!grid)
                 return;
             grid.removeEventListener('click', this.onGridClick);
@@ -343,6 +341,18 @@ class Game {
         this.bga.states.register('PlaceTile', this.placeTile);
         this.bga.states.register('PlaceBonus', this.placeBonus);
     }
+    renderCoveredCells(playerId, coveredCells) {
+        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        if (!grid)
+            return;
+        const cells = Array.isArray(coveredCells)
+            ? coveredCells
+            : Object.values(coveredCells);
+        for (const { x, y } of cells) {
+            grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`)
+                ?.classList.add('gfe-cell-placed');
+        }
+    }
     setup(gamedatas) {
         console.log('Starting game setup', gamedatas);
         this.gamedatas = gamedatas;
@@ -379,6 +389,8 @@ class Game {
                 playGridEl.innerHTML = cellsHTML;
             }
         });
+        const myId = this.bga.players.getCurrentPlayerId();
+        this.renderCoveredCells(myId, gamedatas.coveredCells);
         this.setupNotifications();
         console.log('Ending game setup');
     }
@@ -393,8 +405,18 @@ class Game {
             roundEl.textContent = String(args.round);
     }
     async notif_tilePlaced(args) {
-        console.log('Tile placed:', args);
-        // TODO: render the placed tile on the correct player's grid
+        const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
+        this.renderCoveredCells(args.player_id, cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type })));
+        const gamedatas = this.bga.gameui.gamedatas;
+        cells.forEach(([x, y]) => {
+            gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+        });
+        gamedatas.playerState.has_started = 1;
+        gamedatas.playerState.last_x = args.x;
+        gamedatas.playerState.last_y = args.y;
+        gamedatas.playerState.last_tile_type = args.tile_type;
+        gamedatas.playerState.last_rotation = args.rotation;
+        gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
     }
     async notif_bonusTilePlaced(args) {
         console.log('Bonus tile placed:', args);

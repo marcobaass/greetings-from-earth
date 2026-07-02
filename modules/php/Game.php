@@ -7,8 +7,10 @@ use Bga\Games\GreetingsFromEarth\States\NewRound;
 use Bga\Games\GreetingsFromEarth\States\PlaceTile;
 use Bga\Games\GreetingsFromEarth\States\PlaceBonus;
 use Bga\Games\GreetingsFromEarth\States\EndScore;
+use Bga\GameFramework\UserException;
 
 require_once(__DIR__ . '/constants.inc.php');
+require_once(__DIR__ . '/TileHelper.php');
 
 class Game extends \Bga\GameFramework\Table
 {
@@ -96,7 +98,7 @@ class Game extends \Bga\GameFramework\Table
         $result['currentRound'] = (int) $this->getGameStateValue('current_round');
         $result['diceRoll']     = (int) $this->getGameStateValue('dice_roll');
 
-        $result['coveredCells'] = $this->getCollectionFromDb(
+        $result['coveredCells'] = $this->getObjectListFromDB(
             "SELECT `x`, `y`, `tile_type` FROM `player_cells`
              WHERE `player_id` = '$currentPlayerId'"
         );
@@ -118,8 +120,34 @@ class Game extends \Bga\GameFramework\Table
         int    $rotation,
         bool   $mirror
     ): void {
+        $cells = getShapeCells($tileType, $x, $y, $rotation, $mirror);
+
+        if (count($cells) === 0) {
+            throw new UserException('Invalid tile type');
+        }
         // TODO: validate placement
         // TODO: insert into player_cells
+        foreach ($cells as $cell) {
+            $cx = (int) $cell[0];
+            $cy = (int) $cell[1];
+            static::DbQuery("
+                INSERT INTO `player_cells` (`player_id`, `x`, `y`, `tile_type`)
+                VALUES ($playerId, $cx, $cy, '$tileType')
+            ");
+        }
+
+        $mirrorInt = $mirror ? 1 : 0;
+
+        static::DbQuery("
+            UPDATE `player_state` SET
+                `has_started`     = 1,
+                `last_x`          = $x,
+                `last_y`          = $y,
+                `last_tile_type`  = '$tileType',
+                `last_rotation`   = $rotation,
+                `last_mirror`     = $mirrorInt
+            WHERE `player_id` = $playerId
+        ");
         // TODO: call checkCollectibles()
     }
 

@@ -113,7 +113,6 @@ export class PlaceTile {
                 if(!isPlacementLegal(cells, this.bga.gameui.gamedatas)) return;
 
                 this.bga.actions.performAction('actPlaceTile', {
-                    activePlayerId: this.bga.players.getCurrentPlayerId(),
                     tileType: this.tileSelected,
                     x: this.anchorX,
                     y: this.anchorY,

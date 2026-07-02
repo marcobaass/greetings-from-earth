@@ -1,5 +1,6 @@
 import { PlaceTile } from "./States/PlaceTile";
 import { PlaceBonus } from "./States/PlaceBonus";
+import { getShapeCells } from "./tiles";
 
 export class Game {
     public bga: Bga<GreetingsFromEarthPlayer, GreetingsFromEarthGamedatas>;
@@ -18,6 +19,20 @@ export class Game {
 
         this.bga.states.register('PlaceTile', this.placeTile);
         this.bga.states.register('PlaceBonus', this.placeBonus);
+    }
+
+    private renderCoveredCells(playerId: number, coveredCells: GreetingsFromEarthGamedatas['coveredCells']) {
+        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        if (!grid) return;
+    
+        const cells: { x: number; y: number }[] = Array.isArray(coveredCells)
+            ? coveredCells
+            : Object.values(coveredCells);
+
+        for (const { x, y } of cells) {
+            grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`)
+                ?.classList.add('gfe-cell-placed');
+        }
     }
 
     setup(gamedatas: GreetingsFromEarthGamedatas) {
@@ -60,6 +75,9 @@ export class Game {
         }
         });
 
+        const myId = this.bga.players.getCurrentPlayerId();
+        this.renderCoveredCells(myId, gamedatas.coveredCells);
+
         this.setupNotifications();
         console.log('Ending game setup');
     }
@@ -76,8 +94,22 @@ export class Game {
     }
 
     async notif_tilePlaced(args: NotifTilePlacedArgs) {
-        console.log('Tile placed:', args);
-        // TODO: render the placed tile on the correct player's grid
+        const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
+
+        this.renderCoveredCells(args.player_id, cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type })));
+
+        const gamedatas = this.bga.gameui.gamedatas;
+
+        cells.forEach(([x, y]) => {
+            gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+        });
+
+        gamedatas.playerState.has_started = 1;
+        gamedatas.playerState.last_x = args.x;
+        gamedatas.playerState.last_y = args.y;
+        gamedatas.playerState.last_tile_type = args.tile_type;
+        gamedatas.playerState.last_rotation = args.rotation;
+        gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
     }
 
     async notif_bonusTilePlaced(args: NotifTilePlacedArgs) {
