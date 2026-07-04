@@ -11,6 +11,7 @@ use Bga\GameFramework\UserException;
 
 require_once(__DIR__ . '/constants.inc.php');
 require_once(__DIR__ . '/TileHelper.php');
+require_once(__DIR__ . '/MapHelper.php');
 
 class Game extends \Bga\GameFramework\Table
 {
@@ -110,6 +111,101 @@ class Game extends \Bga\GameFramework\Table
         return $result;
     }
 
+    // ===== PLACEMENT VALIDATION =====
+
+    public function isValidPlacement(
+        int     $playerId,
+        string  $tileType,
+        int     $x,
+        int     $y,
+        int     $rotation,
+        bool    $mirror,
+    ):bool {
+        $cells = getShapeCells($tileType, $x, $y, $rotation, $mirror);
+
+        if (count($cells) === 0) {
+            return false;
+        }
+
+        foreach ($cells as $cell) {
+            $cx = (int) $cell[0];
+            $cy = (int) $cell[1];
+            if ($cx < 0 || $cx >17 || $cy < 0 || $cy > 12) {
+                return false;
+            }
+        }
+
+        foreach ($cells as $cell) {
+            $cx = (int) $cell[0];
+            $cy = (int) $cell[1];
+            $type = getCellType($cx, $cy);
+            if (in_array($type, [CELL_RIVER, CELL_SBAHN, CELL_MONUMENT], true))
+            return false;
+        }
+        
+        $coveredCells = $this->getObjectListFromDB(
+            "SELECT `x`, `y`, `tile_type` FROM `player_cells` WHERE `player_id` = '$playerId'"
+        );
+
+        $covered = [];
+        foreach ($coveredCells as $coveredCell) {
+            $key = cellKey((int) $coveredCell['x'], (int) $coveredCell['y']);
+            $covered[$key] = true;
+        }
+
+        foreach ($cells as $cell) {
+            $cx = (int) $cell[0];
+            $cy = (int) $cell[1];
+            if (isset($covered[cellKey($cx, $cy)])) {
+                return false;
+            }
+        }
+
+        $playerState = $this->getObjectFromDB(
+            "SELECT * FROM `player_state` WHERE `player_id` = '$playerId'"
+        );
+        
+        $references = getSbahnCellSet();
+
+        if ((int) $playerState['has_started'] !== 0) {
+            if ($playerState['last_tile_type'] !== null) {
+                $lastCells = getShapeCells(
+                    $playerState['last_tile_type'],
+                    (int) $playerState['last_x'],
+                    (int) $playerState['last_y'],
+                    (int) $playerState['last_rotation'],
+                    ((int) $playerState['last_mirror']) === 1
+                );
+                foreach ($lastCells as $lastCell) {
+                    $references[cellKey((int) $lastCell[0], (int) $lastCell[1])] = true;
+                }
+            }
+        }
+
+        forEach ($cells as $cell) {
+            $cx = (int) $cell[0];
+            $cy = (int) $cell[1];
+
+            $neighbours = [
+                [$cx + 1, $cy],
+                [$cx - 1, $cy],
+                [$cx, $cy + 1],
+                [$cx, $cy - 1],
+            ];
+
+            forEach ($neighbours as $neighbour) {
+                $nx = (int) $neighbour[0];
+                $ny = (int) $neighbour[1];
+
+                if (isset($references[cellKey($nx, $ny)])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     // ===== TILE PLACEMENT =====
 
     public function placeTile(
@@ -125,8 +221,12 @@ class Game extends \Bga\GameFramework\Table
         if (count($cells) === 0) {
             throw new UserException('Invalid tile type');
         }
-        // TODO: validate placement
-        // TODO: insert into player_cells
+        // validate placement
+        if (!$this->isValidPlacement($playerId, $tileType, $x, $y, $rotation, $mirror)) {
+            throw new UserException(clienttranslate('Illegal tile placement'));
+        }
+
+        // insert into player_cells
         foreach ($cells as $cell) {
             $cx = (int) $cell[0];
             $cy = (int) $cell[1];

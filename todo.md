@@ -22,15 +22,17 @@
 - [x] `placement.ts`: overlap, adjacency, `isPlacementLegal`
 - [x] `PlaceTile`: `updateActionButtons`, ✔ only when legal
 - [x] `placeTileArgs` on class; gamedatas via `this.bga.gameui.gamedatas`
+- [x] `TileHelper.php`: PHP `getShapeCells` (matches `tiles.ts`)
+- [x] `actPlaceTile`: `$currentPlayerId` magic param (`PlaceTile.php`, `PlaceBonus.php`)
 
 ---
 
 ## Next — server smoke test
 
-- [ ] `Game::placeTile()`: insert into `player_cells`, update `player_state`
-- [ ] `notif_tilePlaced`: render cells + update client `gamedatas.coveredCells`
-- [ ] `Game::isValidPlacement()` on server (mirror client rules)
-- [ ] Build → SFTP → test: pick tile → place next to S-Bahn → ✔ → submit
+- [x] `Game::placeTile()`: insert into `player_cells`, update `player_state`
+- [x] `notif_tilePlaced`: render cells + update client `gamedatas.coveredCells`
+- [x] `Game::isValidPlacement()` on server (mirror client rules)
+- [x] Build → SFTP → test: pick tile → place next to S-Bahn → ✔ → submit
 
 **Note:** ✔ only appears when placement is legal. First tile must be **orthogonally adjacent** to an S-Bahn cell: `(8,0)`, `(0,5)`, `(17,5)`, `(8,12)`. Preview at `(0,0)` is usually invalid — expected.
 
@@ -58,10 +60,10 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 
 ## Later — validation & polish
 
-- [ ] Port rotation/mirror helpers to PHP (same order: rotate → mirror, `effectiveRotation` rule)
+- [x] Port rotation/mirror helpers to PHP (same order: rotate → mirror, `effectiveRotation` rule)
 - [ ] Green/red preview when invalid (optional; auto-slide stays)
 - [ ] `onPlayerActivationChange(false)`: cleanup when deactivated after submit
-- [ ] `setup()`: render `gamedatas.coveredCells` on F5 reload
+- [x] `setup()`: render `gamedatas.coveredCells` on F5 reload
 
 ---
 
@@ -83,4 +85,4 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 
 ## Current step
 
-**Next:** `Game::placeTile()` + `notif_tilePlaced` — end-to-end submit and persist cells. Then **1- and 2-square tile choice** (core rule every round).
+Next: Game::isValidPlacement() on server. Then 1- and 2-square tile choice.
