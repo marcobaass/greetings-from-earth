@@ -18,7 +18,11 @@ const TILE_U5  = 'U5';   // U-shape 5-square
 const TILE_L4  = 'L4';   // L-shape 4-square
 const TILE_T4  = 'T4';   // T-shape 4-square
 const TILE_SZ4 = 'SZ4';  // S/Z-shape 4-square
-const TILE_L5  = 'L5';   // L-shape 5-square
+const TILE_T5  = 'T5';   // T-shape 5-square
+const TILE_I1 = 'I1'; // 1-square tile
+const TILE_I2 = 'I2'; // 2-square tile
+
+const ALWAYS_AVAILABLE_TILES = [TILE_I1, TILE_I2];
 
 // Dice wheel — roll => [option A, option B]
 const DICE_WHEEL = [
@@ -26,8 +30,8 @@ const DICE_WHEEL = [
     2 => [TILE_U5,  TILE_L4],
     3 => [TILE_L4,  TILE_T4],
     4 => [TILE_SZ4, TILE_T4],
-    5 => [TILE_L5,  TILE_SZ4],
-    6 => [TILE_L5,  TILE_I4],
+    5 => [TILE_T5,  TILE_SZ4],
+    6 => [TILE_T5,  TILE_I4],
 ];
 
 // Tile shapes — array of [dx, dy] offsets from anchor cell
@@ -38,7 +42,9 @@ const TILE_SHAPES = [
     TILE_L4  => [[0,0],[0,1],[0,2],[1,2]],
     TILE_T4  => [[0,0],[1,0],[2,0],[1,1]],
     TILE_SZ4 => [[0,0],[1,0],[1,1],[2,1]],
-    TILE_L5  => [[0,0],[0,1],[0,2],[0,3],[1,3]],
+    TILE_T5  => [[0,0], [0,1], [-1,2], [0,2], [1,2]],
+    TILE_I1  => [[0,0]],
+    TILE_I2  => [[0,0],[1,0]],
 ];
 
 // Berlin map — 18 columns x 13 rows, top-left = (0,0)

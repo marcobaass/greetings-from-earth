@@ -21,8 +21,8 @@ class Game extends \Bga\GameFramework\Table
         2 => ['U5', 'L4'],
         3 => ['L4', 'T4'],
         4 => ['SZ4', 'T4'],
-        5 => ['L5', 'SZ4'],
-        6 => ['L5', 'I4'],
+        5 => ['T5', 'SZ4'],
+        6 => ['T5', 'I4'],
     ];
 
     public function __construct()

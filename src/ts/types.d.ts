@@ -29,6 +29,7 @@ interface GreetingsFromEarthGamedatas extends Gamedatas<GreetingsFromEarthPlayer
 interface PlaceTileArgs {
     diceRoll: number;
     tileOptions: string[];
+    alwaysAvailableTiles: string[];
 }
 
 interface PlaceBonusArgs {

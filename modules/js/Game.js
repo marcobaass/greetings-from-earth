@@ -45,7 +45,9 @@ const TILE_SHAPES = {
     L4: [[0, 0], [0, 1], [0, 2], [1, 2]],
     T4: [[0, 0], [1, 0], [2, 0], [1, 1]],
     SZ4: [[0, 0], [1, 0], [1, 1], [2, 1]],
-    L5: [[0, 0], [0, 1], [0, 2], [0, 3], [1, 3]],
+    T5: [[0, 0], [0, 1], [-1, 2], [0, 2], [1, 2]],
+    I1: [[0, 0]],
+    I2: [[0, 0], [1, 0]],
 };
 // Order: rotate, then mirror — must match PHP
 function getShapeCells(tileType, anchorX, anchorY, rotation = 0, mirror = false) {
@@ -161,7 +163,28 @@ class PlaceTile {
     cleanUpPreview(grid) {
         grid.querySelectorAll('.gfe-cell-preview').forEach(el => {
             el.classList.remove('gfe-cell-preview');
+            el.classList.remove('gfe-cell-preview-valid');
+            el.classList.remove('gfe-cell-preview-illegal');
         });
+    }
+    resetPlacementState() {
+        this.tileSelected = null;
+        this.anchorX = null;
+        this.anchorY = null;
+        this.rotation = 0;
+        this.mirror = false;
+    }
+    cleanupActivePlayer() {
+        const playerId = this.bga.players.getCurrentPlayerId();
+        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        if (!grid)
+            return;
+        // remove valid/invalid indicators
+        this.cleanUpPreview(grid);
+        grid.classList.remove('gfe-play-grid-interactive');
+        grid.removeEventListener('click', this.onGridClick);
+        // forgets which tile player picked up and where
+        this.resetPlacementState();
     }
     /**
      * Shows a preview of the tile on the grid
@@ -182,13 +205,14 @@ class PlaceTile {
         this.anchorX = anchorX;
         this.anchorY = anchorY;
         this.cleanUpPreview(grid);
+        const legal = isPlacementLegal(cells, this.bga.gameui.gamedatas);
         cells.forEach(([x, y]) => {
             const cellElement = grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`);
             if (cellElement) {
                 cellElement.classList.add('gfe-cell-preview');
+                cellElement.classList.add(legal ? 'gfe-cell-preview-valid' : 'gfe-cell-preview-illegal');
             }
         });
-        const legal = isPlacementLegal(cells, this.bga.gameui.gamedatas);
         if (!this.placeTileArgs)
             return;
         this.updateActionButtons(legal, grid);
@@ -197,7 +221,11 @@ class PlaceTile {
         this.bga.statusBar.removeActionButtons();
         if (!this.placeTileArgs)
             return;
-        this.placeTileArgs.tileOptions.forEach(tile => {
+        const allTiles = [
+            ...this.placeTileArgs.tileOptions,
+            ...this.placeTileArgs.alwaysAvailableTiles,
+        ];
+        allTiles.forEach(tile => {
             this.bga.statusBar.addActionButton(tile, () => {
                 this.tileSelected = tile;
                 this.anchorX = 0;
@@ -279,33 +307,29 @@ class PlaceTile {
             _('${you} must place your tile on the map') :
             _('Other players are placing their tile...'));
         if (isCurrentPlayerActive) {
-            // TODO: show tile options and enable grid interaction
             const playerId = this.bga.players.getCurrentPlayerId();
             const grid = document.getElementById(`gfe-play-grid-${playerId}`);
             if (!grid)
                 return;
             grid.removeEventListener('click', this.onGridClick);
+            grid.classList.add('gfe-play-grid-interactive');
             grid.addEventListener('click', this.onGridClick);
             this.updateActionButtons(false, grid);
         }
     }
     onLeavingState(args, isCurrentPlayerActive) {
-        const playerId = this.bga.players.getCurrentPlayerId();
-        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-        if (!grid)
-            return;
-        this.cleanUpPreview(grid);
-        grid.removeEventListener('click', this.onGridClick);
-        this.tileSelected = null;
-        this.anchorX = null;
-        this.anchorY = null;
-        this.rotation = 0;
-        this.mirror = false;
+        this.cleanupActivePlayer();
         this.placeTileArgs = null;
     }
     onPlayerActivationChange(args, isCurrentPlayerActive) {
-        this.bga.statusBar.removeActionButtons();
-        this.onEnteringState(args, isCurrentPlayerActive);
+        this.placeTileArgs = args;
+        if (!isCurrentPlayerActive) {
+            this.bga.statusBar.removeActionButtons();
+            this.cleanupActivePlayer();
+            this.bga.statusBar.setTitle(_('Other players are placing their tile...'));
+            return;
+        }
+        this.onEnteringState(args, true);
     }
 }
 

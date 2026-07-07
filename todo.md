@@ -42,27 +42,27 @@
 
 Each round the dice offers 2 polyomino options (`tileOptions`). Players may instead choose:
 
-- [ ] **1-square tile** (alternative to dice options)
-- [ ] **2-square tile** (alternative to dice options)
+- [x] **1-square tile** (alternative to dice options)
+- [x] **2-square tile** (alternative to dice options)
 
 **Server**
 
-- [ ] Extend `PlaceTile` / `NewRound` args: send 1- and 2-square types alongside dice pair
-- [ ] Add shapes to `TILE_SHAPES` / constants if needed (single cell, domino)
-- [ ] `actPlaceTile` accepts these types like any other tile
+- [x] Extend `PlaceTile` / `NewRound` args: send 1- and 2-square types alongside dice pair
+- [x] Add shapes to `TILE_SHAPES` / constants if needed (single cell, domino)
+- [x] `actPlaceTile` accepts these types like any other tile
 
 **Client**
 
-- [ ] `updateActionButtons`: show 1- and 2-square buttons with dice options
-- [ ] Preview, validation, and confirm work for small tiles
+- [x] `updateActionButtons`: show 1- and 2-square buttons with dice options
+- [x] Preview, validation, and confirm work for small tiles
 
 ---
 
 ## Later — validation & polish
 
 - [x] Port rotation/mirror helpers to PHP (same order: rotate → mirror, `effectiveRotation` rule)
-- [ ] Green/red preview when invalid (optional; auto-slide stays)
-- [ ] `onPlayerActivationChange(false)`: cleanup when deactivated after submit
+- [x] Green/red preview when invalid (optional; auto-slide stays)
+- [x] `onPlayerActivationChange(false)`: cleanup when deactivated after submit
 - [x] `setup()`: render `gamedatas.coveredCells` on F5 reload
 
 ---
@@ -72,13 +72,13 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [ ] Valid-placement hint: highlight where a tile may legally touch (S-Bahn on first turn; last tile + S-Bahn later)
 - [ ] SVG preview overlay (replace or layer on CSS cells)
 - [ ] Optional: ring controls on board (Ark Nova style)
-- [ ] Optional: keyboard R / M / Enter
 
 ---
 
 ## Later — game logic
 
 - [ ] `checkCollectibles()`, `PlaceBonus` UI, scoring
+- [ ] implement 'undo'
 - [ ] More maps / content
 
 ---

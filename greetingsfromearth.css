@@ -62,14 +62,17 @@
     grid-template-rows: repeat(13, 1fr);
 }
 
-.gfe-cell {
-    border: 1px solid rgba(255, 0, 0, 0.3);
-    box-sizing: border-box;
+.gfe-play-grid-interactive .gfe-cell {
     cursor: pointer;
 }
 
-.gfe-cell:hover {
+.gfe-play-grid-interactive .gfe-cell:hover {
     background: rgba(255, 255, 0, 0.3);
+}
+
+.gfe-cell {
+    /* border: 1px solid rgba(255, 0, 0, 0.3); */
+    box-sizing: border-box;
 }
 
 .gfe-dice-indicator {
@@ -130,8 +133,15 @@
 }
 
 .gfe-cell-preview {
-    background: rgba(0, 128, 0, 0.25);
     border: 3px solid black;
+}
+
+.gfe-cell-preview-valid {
+    background: rgba(0, 128, 0, 0.25);
+}
+
+.gfe-cell-preview-illegal {
+    background: rgba(255, 0, 0, 0.25);
 }
 
 .gfe-cell-placed {

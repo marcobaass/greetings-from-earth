@@ -26,7 +26,32 @@ export class PlaceTile {
     private cleanUpPreview(grid: HTMLElement) {
         grid.querySelectorAll('.gfe-cell-preview').forEach(el => {
             el.classList.remove('gfe-cell-preview');
+            el.classList.remove('gfe-cell-preview-valid');
+            el.classList.remove('gfe-cell-preview-illegal');
         });
+    }
+
+    private resetPlacementState() {
+        this.tileSelected = null;
+        this.anchorX = null;
+        this.anchorY = null;
+        this.rotation = 0;
+        this.mirror = false;
+    }
+
+    private cleanupActivePlayer() {
+        const playerId = this.bga.players.getCurrentPlayerId();
+        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        if (!grid) return;
+
+        // remove valid/invalid indicators
+        this.cleanUpPreview(grid);
+
+        grid.classList.remove('gfe-play-grid-interactive')
+        grid.removeEventListener('click', this.onGridClick);
+
+        // forgets which tile player picked up and where
+        this.resetPlacementState();
     }
     
     private rotation = 0;
@@ -54,16 +79,17 @@ export class PlaceTile {
         
         this.cleanUpPreview(grid);
         
+        const legal = isPlacementLegal(cells, this.bga.gameui.gamedatas);
+        
         cells.forEach(([x, y]) => {
             const cellElement = grid.querySelector(
                 `.gfe-cell[data-x="${x}"][data-y="${y}"]`
             );
             if (cellElement) {
                 cellElement.classList.add('gfe-cell-preview');
+                cellElement.classList.add(legal ? 'gfe-cell-preview-valid' : 'gfe-cell-preview-illegal');
             }
         });
-        
-        const legal = isPlacementLegal(cells, this.bga.gameui.gamedatas);
 
         if (!this.placeTileArgs) return;
 
@@ -75,7 +101,12 @@ export class PlaceTile {
 
         if (!this.placeTileArgs) return;
 
-        this.placeTileArgs.tileOptions.forEach(tile => {
+        const allTiles = [
+            ...this.placeTileArgs.tileOptions,
+            ...this.placeTileArgs.alwaysAvailableTiles,
+        ];
+
+        allTiles.forEach(tile => {
             this.bga.statusBar.addActionButton(tile, () => {
                 this.tileSelected = tile;
                 this.anchorX = 0;
@@ -145,13 +176,13 @@ export class PlaceTile {
         
 
         if (isCurrentPlayerActive) {
-            // TODO: show tile options and enable grid interaction
             const playerId = this.bga.players.getCurrentPlayerId();
             const grid = document.getElementById(`gfe-play-grid-${playerId}`);  
 
             if (!grid) return;
 
             grid.removeEventListener('click', this.onGridClick);
+            grid.classList.add('gfe-play-grid-interactive')
             grid.addEventListener('click', this.onGridClick);
             this.updateActionButtons(false, grid);
         }
@@ -159,22 +190,20 @@ export class PlaceTile {
     }
 
     onLeavingState(args: PlaceTileArgs, isCurrentPlayerActive: boolean) {
-        const playerId = this.bga.players.getCurrentPlayerId();
-        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-        if(!grid) return;
-        this.cleanUpPreview(grid);
-        grid.removeEventListener('click', this.onGridClick);
-
-        this.tileSelected = null;
-        this.anchorX = null;
-        this.anchorY = null;
-        this.rotation = 0;
-        this.mirror = false;
+        this.cleanupActivePlayer();
         this.placeTileArgs = null;
     }
     
     onPlayerActivationChange(args: PlaceTileArgs, isCurrentPlayerActive: boolean) {
-        this.bga.statusBar.removeActionButtons();
-        this.onEnteringState(args, isCurrentPlayerActive);
+        this.placeTileArgs = args;
+
+        if (!isCurrentPlayerActive) {
+            this.bga.statusBar.removeActionButtons();
+            this.cleanupActivePlayer();
+            this.bga.statusBar.setTitle(_('Other players are placing their tile...'));
+            return;
+        }
+
+        this.onEnteringState(args, true);
     }
 }

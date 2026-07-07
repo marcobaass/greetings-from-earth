@@ -36,6 +36,7 @@ class PlaceTile extends GameState
         return [
             'diceRoll'    => $diceRoll,
             'tileOptions' => $tileOptions,  // e.g. ['L5', 'I4'] etc.
+            'alwaysAvailableTiles' => ALWAYS_AVAILABLE_TILES,
         ];
     }
 
@@ -53,7 +54,10 @@ class PlaceTile extends GameState
         bool   $mirror,
     ): string|null {
         $diceRoll = (int) $this->game->getGameStateValue('dice_roll');
-        $validTiles = Game::DICE_WHEEL[$diceRoll];
+        $validTiles = array_merge(
+            Game::DICE_WHEEL[$diceRoll],
+            ALWAYS_AVAILABLE_TILES,
+        );
         if (!in_array($tileType, $validTiles)) {
             throw new UserException('Invalid tile choice');
         }

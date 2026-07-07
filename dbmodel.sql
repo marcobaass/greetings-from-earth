@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS `player_state` (
     `last_x`                TINYINT(2)      DEFAULT NULL,
     `last_y`                TINYINT(2)      DEFAULT NULL,
     `last_tile_type`        VARCHAR(4)      DEFAULT NULL,
-    `last_rotation`         TINYINT         NOT NULL DEFAULT 0,
+    `last_rotation`         SMALLINT         NOT NULL DEFAULT 0,
     `last_mirror`           TINYINT         NOT NULL DEFAULT 0,
     `has_started`           TINYINT(1)      NOT NULL DEFAULT 0,
     `currywurst_count`      TINYINT(2)      NOT NULL DEFAULT 0,
