@@ -73,6 +73,11 @@ class PlaceTile extends GameState
             'rotation'    => $rotation,
             'mirror'      => $mirror,
         ]);
+
+        // If no bonus tiles are pending, finalize the turn
+        if (! $this->game->hasPendingBonusTiles($currentPlayerId)) {
+            $this->game->finalizeTurn($currentPlayerId);
+        }
     
         // Check bonus tiles BEFORE deactivating
         $nextState = $this->game->hasPendingBonusTiles($currentPlayerId)

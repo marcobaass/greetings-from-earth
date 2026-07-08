@@ -377,6 +377,15 @@ class Game {
                 ?.classList.add('gfe-cell-placed');
         }
     }
+    renderCollectionTrack(playerId, count) {
+        const track = document.getElementById(`gfe-collection-track-${playerId}`);
+        if (!track)
+            return;
+        track.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${84.15 + i * 0.1}%; left: ${7.85 + i * 5.7}%"></div>`;
+        }
+    }
     setup(gamedatas) {
         console.log('Starting game setup', gamedatas);
         this.gamedatas = gamedatas;
@@ -398,6 +407,7 @@ class Game {
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
+                        <div id="gfe-collection-track-${playerId}" class="gfe-collection-track"></div>
                     </div>
                 </div>
             `);
@@ -413,8 +423,10 @@ class Game {
                 playGridEl.innerHTML = cellsHTML;
             }
         });
+        // Set up collection track
         const myId = this.bga.players.getCurrentPlayerId();
         this.renderCoveredCells(myId, gamedatas.coveredCells);
+        this.renderCollectionTrack(myId, Number(gamedatas.playerState.collection_count));
         this.setupNotifications();
         console.log('Ending game setup');
     }
@@ -445,6 +457,9 @@ class Game {
     async notif_bonusTilePlaced(args) {
         console.log('Bonus tile placed:', args);
         // TODO: render the bonus tile on the correct player's grid
+    }
+    async notif_turnFinalized(args) {
+        this.renderCollectionTrack(args.player_id, args.collection_count);
     }
 }
 

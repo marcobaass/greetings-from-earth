@@ -1,3 +1,5 @@
+> Rules reference: see `Rules_A4.pdf` (and optionally summarize key scoring rules in `gamerules.md`).
+
 # Greetings from Earth — TODO
 
 `- [ ]` not started · `- [x]` done
@@ -77,12 +79,29 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 
 ## Later — game logic
 
-- [ ] `checkCollectibles()`, `PlaceBonus` UI, scoring
+- [x] Collection balls: end-of-turn scoring, circles, live score updates
+- [ ] Bonus tiles: triggers, server + client
+- [ ] UFO scoring
+- [ ] Must-see clusters
+- [ ] Monument surround scoring
+- [ ] Street art / graffiti scoring
 - [ ] implement 'undo'
 - [ ] More maps / content
 
 ---
 
-## Current step
-
-Next: Game::isValidPlacement() on server. Then 1- and 2-square tile choice.
+## Next — bonus tiles
+- [ ] Server: trigger bonus when covering currywurst / e-scooter
+  - [ ] Increment `currywurst_count` / `escooter_count`
+  - [ ] Append tile ids (e.g. `I1`, `I2`) to `pending_bonus_tiles`
+- [ ] Server: implement `placeBonusTile` in `Game.php`
+  - [ ] Validate placement (reuse `isValidPlacement`)
+  - [ ] Insert into `player_cells`, update `last_*`
+  - [ ] Remove one tile from `pending_bonus_tiles`
+  - [ ] Call `addCellsThisTurn` for bonus cells
+- [ ] Flow: in `PlaceBonus`, call `finalizeTurn` when `hasPendingBonusTiles` becomes false
+- [ ] Client: `PlaceBonus.ts` UI
+  - [ ] Show `pendingTiles` as buttons
+  - [ ] Reuse grid preview / rotate / mirror
+  - [ ] Call `actPlaceBonusTile`
+- [ ] Client: `notif_bonusTilePlaced` renders tiles like `notif_tilePlaced`

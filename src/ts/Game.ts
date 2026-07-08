@@ -35,6 +35,17 @@ export class Game {
         }
     }
 
+    private renderCollectionTrack(playerId: number, count: number): void {
+        const track = document.getElementById(`gfe-collection-track-${playerId}`);
+        if (!track) return;
+
+        track.innerHTML = '';
+
+        for (let i = 0; i < count; i++) {
+            track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${84.15 + i * 0.1}%; left: ${7.85 + i * 5.7}%"></div>`;
+        }
+    }
+    
     setup(gamedatas: GreetingsFromEarthGamedatas) {
         console.log('Starting game setup', gamedatas);
         this.gamedatas = gamedatas;
@@ -58,25 +69,30 @@ export class Game {
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
+                        <div id="gfe-collection-track-${playerId}" class="gfe-collection-track"></div>
                     </div>
                 </div>
             `);
 
-        // Set up player's play grid
-        const playGridEl = document.getElementById(`gfe-play-grid-${playerId}`);
-        if (playGridEl) {
-            let cellsHTML = '';
-            for (let y = 0; y < 13; y++) {
-                for (let x = 0; x < 18; x++) {
-                    cellsHTML += `<div class="gfe-cell" data-x="${x}" data-y="${y}"></div>`;
+            // Set up player's play grid
+            const playGridEl = document.getElementById(`gfe-play-grid-${playerId}`);
+            if (playGridEl) {
+                let cellsHTML = '';
+                for (let y = 0; y < 13; y++) {
+                    for (let x = 0; x < 18; x++) {
+                        cellsHTML += `<div class="gfe-cell" data-x="${x}" data-y="${y}"></div>`;
+                    }
                 }
+                playGridEl.innerHTML = cellsHTML;
             }
-            playGridEl.innerHTML = cellsHTML;
-        }
         });
+
+        // Set up collection track
 
         const myId = this.bga.players.getCurrentPlayerId();
         this.renderCoveredCells(myId, gamedatas.coveredCells);
+
+        this.renderCollectionTrack(myId, Number(gamedatas.playerState.collection_count));
 
         this.setupNotifications();
         console.log('Ending game setup');
@@ -115,5 +131,9 @@ export class Game {
     async notif_bonusTilePlaced(args: NotifTilePlacedArgs) {
         console.log('Bonus tile placed:', args);
         // TODO: render the bonus tile on the correct player's grid
+    }
+
+    async notif_turnFinalized(args: NotifTurnFinalizedArgs) {
+        this.renderCollectionTrack(args.player_id, args.collection_count);
     }
 }

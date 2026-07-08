@@ -22,6 +22,7 @@ interface GreetingsFromEarthGamedatas extends Gamedatas<GreetingsFromEarthPlayer
         street_art_progress: number;
         pending_bonus_tiles: string;
         mustsee_completed: string;
+        cells_this_turn: string;
     };
 }
 
@@ -50,4 +51,9 @@ interface NotifTilePlacedArgs {
 interface NotifNewRoundArgs {
     round: number;
     dice_roll: number;
+}
+
+interface NotifTurnFinalizedArgs {
+    player_id: number;
+    collection_count: number;
 }

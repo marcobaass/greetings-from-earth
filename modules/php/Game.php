@@ -248,7 +248,8 @@ class Game extends \Bga\GameFramework\Table
                 `last_mirror`     = $mirrorInt
             WHERE `player_id` = $playerId
         ");
-        // TODO: call checkCollectibles()
+
+        $this->addCellsThisTurn($playerId, $cells);
     }
 
     public function placeBonusTile(
@@ -291,6 +292,81 @@ class Game extends \Bga\GameFramework\Table
             "UPDATE `player_state` SET `pending_bonus_tiles` = '[]'
              WHERE `player_id` = '$playerId'"
         );
+    }
+
+    // ===== CELLS THIS TURN =====
+
+    public function getCellsThisTurn(int $playerId): array
+    {
+        $state = $this->getObjectFromDb(
+            "SELECT `cells_this_turn` FROM `player_state`
+             WHERE `player_id` = '$playerId'"
+        );
+        return json_decode($state['cells_this_turn'], true);
+    }
+
+    public function addCellsThisTurn(int $playerId, array $cells): void
+    {
+        $cellKeys = array_map(function($cell) {
+            return cellKey((int) $cell[0], (int) $cell[1]);
+        }, $cells);
+        $currentCells = $this->getCellsThisTurn($playerId);
+        $newCells = array_merge($currentCells, $cellKeys);
+        static::DbQuery(
+            "UPDATE `player_state` SET `cells_this_turn` = '".json_encode($newCells)."'
+             WHERE `player_id` = '$playerId'"
+        );
+    }
+
+    public function clearCellsThisTurn(int $playerId): void
+    {
+        static::DbQuery(
+            "UPDATE `player_state` SET `cells_this_turn` = '[]'
+             WHERE `player_id` = '$playerId'"
+        );
+    }
+
+    public function finalizeTurn(int $playerId): void {
+        $cellKeys = $this->getCellsThisTurn($playerId);
+        $this->checkCollectibles($playerId, $cellKeys);
+        $this->clearCellsThisTurn($playerId);
+
+        $state = $this->getObjectFromDb("SELECT collection_count FROM player_state WHERE player_id = '$playerId'");
+        $collectionCount = (int) $state['collection_count'];
+
+        $this->notify->all('turnFinalized', clienttranslate('${player_name} ends their turn'), [
+            'player_id'        => $playerId,
+            'player_name'      => $this->getPlayerNameById($playerId),
+            'collection_count' => $collectionCount,
+        ]);
+    }
+
+
+    // ===== CHECK COLLECTIBLES =====
+
+    public function checkCollectibles(int $playerId, array $cellKeys): void
+    {
+        foreach ($cellKeys as $cellKey) {
+            list($x, $y) = explode(',', $cellKey);
+            $type = getCellType((int) $x, (int) $y);
+            if (in_array($type, [CELL_COLLECTION], true)) {
+                $state = $this->getObjectFromDb(
+                    "SELECT `collection_count` FROM `player_state`
+                     WHERE `player_id` = '$playerId'"
+                );
+                $count = (int) $state['collection_count'];
+
+                $newCount = $count + 1;
+
+                static::DbQuery(
+                    "UPDATE `player_state` SET `collection_count` = $newCount
+                     WHERE `player_id` = '$playerId'"
+                );
+
+                $this->playerScore->inc($playerId, 2);
+
+            }
+        }
     }
 
     // ===== DEBUG HELPERS =====
