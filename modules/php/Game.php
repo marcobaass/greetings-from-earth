@@ -250,6 +250,12 @@ class Game extends \Bga\GameFramework\Table
         ");
 
         $this->addCellsThisTurn($playerId, $cells);
+
+        $cellKeys = array_map(function($cell) {
+            return cellKey((int) $cell[0], (int) $cell[1]);
+        }, $cells);
+
+        $this->checkBonusTilesFromCells($playerId, $cellKeys);
     }
 
     public function placeBonusTile(
@@ -260,9 +266,50 @@ class Game extends \Bga\GameFramework\Table
         int    $rotation,
         bool   $mirror
     ): void {
-        // TODO: validate placement
-        // TODO: insert into player_cells
-        // TODO: remove from pending_bonus_tiles
+        $cells = getShapeCells($tileType, $x, $y, $rotation, $mirror);
+
+        if (count($cells) === 0) {
+            throw new UserException('Invalid tile type');
+        }
+
+        // validate placement
+        if (!$this->isValidPlacement($playerId, $tileType, $x, $y, $rotation, $mirror)) {
+            throw new UserException(clienttranslate('Illegal tile placement'));
+        }
+
+        // insert into player_cells
+        foreach ($cells as $cell) {
+            $cx = (int) $cell[0];
+            $cy = (int) $cell[1];
+            static::DbQuery("
+                INSERT INTO `player_cells` (`player_id`, `x`, `y`, `tile_type`)
+                VALUES ($playerId, $cx, $cy, '$tileType')
+            ");
+        }
+
+        $mirrorInt = $mirror ? 1 : 0;
+
+        static::DbQuery("
+            UPDATE `player_state` SET
+                `has_started`     = 1,
+                `last_x`          = $x,
+                `last_y`          = $y,
+                `last_tile_type`  = '$tileType',
+                `last_rotation`   = $rotation,
+                `last_mirror`     = $mirrorInt
+            WHERE `player_id` = $playerId
+        ");
+
+        $this->addCellsThisTurn($playerId, $cells);
+
+        $cellKeys = array_map(function($cell) {
+            return cellKey((int) $cell[0], (int) $cell[1]);
+        }, $cells);
+
+        $this->removePendingBonusTile($playerId, $tileType);
+
+        $this->checkBonusTilesFromCells($playerId, $cellKeys);
+
     }
 
     // ===== BONUS TILE HELPERS =====
@@ -291,6 +338,20 @@ class Game extends \Bga\GameFramework\Table
         static::DbQuery(
             "UPDATE `player_state` SET `pending_bonus_tiles` = '[]'
              WHERE `player_id` = '$playerId'"
+        );
+    }
+
+    public function removePendingBonusTile(int $playerId, string $tileType): void
+    {
+        $tiles = $this->getPendingBonusTiles($playerId);
+        $index = array_search($tileType, $tiles, true);
+        if ($index === false) {
+            throw new UserException('Tile type not found in pending bonus tiles');
+        }
+        array_splice($tiles, $index, 1);
+        static::DbQuery(
+            "UPDATE `player_state` SET `pending_bonus_tiles` = '" . json_encode($tiles) . "'
+            WHERE `player_id` = '$playerId'"
         );
     }
 
@@ -365,6 +426,35 @@ class Game extends \Bga\GameFramework\Table
 
                 $this->playerScore->inc($playerId, 2);
 
+            }
+        }
+    }
+
+    // ===== CHECK Currywurst and E-Scooter =====
+
+    public function checkBonusTilesFromCells(int $playerId, array $cellKeys): void
+    {
+        
+        foreach ($cellKeys as $cellKey) {
+            list($x, $y) = explode(',', $cellKey);
+            $type = getCellType((int) $x, (int) $y);
+            if (in_array($type, [CELL_CURRYWURST], true)) {
+                $tiles = $this->getPendingBonusTiles($playerId);
+                $tiles[] = 'I2';
+
+                static::DbQuery(
+                    "UPDATE `player_state` SET `pending_bonus_tiles` = '".json_encode($tiles)."'
+                     WHERE `player_id` = '$playerId'"
+                );
+            }
+            if (in_array($type, [CELL_ESCOOTER], true)) {
+                $tiles = $this->getPendingBonusTiles($playerId);
+                $tiles[] = 'I4';
+
+                static::DbQuery(
+                    "UPDATE `player_state` SET `pending_bonus_tiles` = '".json_encode($tiles)."'
+                     WHERE `player_id` = '$playerId'"
+                );
             }
         }
     }

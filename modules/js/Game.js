@@ -161,10 +161,10 @@ function isPlacementLegal(tileCells, gamedatas) {
 
 class PlaceTile {
     cleanUpPreview(grid) {
-        grid.querySelectorAll('.gfe-cell-preview').forEach(el => {
-            el.classList.remove('gfe-cell-preview');
-            el.classList.remove('gfe-cell-preview-valid');
-            el.classList.remove('gfe-cell-preview-illegal');
+        grid.querySelectorAll(".gfe-cell-preview").forEach((el) => {
+            el.classList.remove("gfe-cell-preview");
+            el.classList.remove("gfe-cell-preview-valid");
+            el.classList.remove("gfe-cell-preview-illegal");
         });
     }
     resetPlacementState() {
@@ -181,8 +181,8 @@ class PlaceTile {
             return;
         // remove valid/invalid indicators
         this.cleanUpPreview(grid);
-        grid.classList.remove('gfe-play-grid-interactive');
-        grid.removeEventListener('click', this.onGridClick);
+        grid.classList.remove("gfe-play-grid-interactive");
+        grid.removeEventListener("click", this.onGridClick);
         // forgets which tile player picked up and where
         this.resetPlacementState();
     }
@@ -192,7 +192,7 @@ class PlaceTile {
      * @param tileType The type of tile to show the preview for
      * @param anchorX The x coordinate of the anchor point
      * @param anchorY The y coordinate of the anchor point
-    */
+     */
     showPreview(grid, tileType, anchorX, anchorY) {
         let cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
         if (!isInsideGrid(cells)) {
@@ -201,7 +201,6 @@ class PlaceTile {
             anchorY += shiftY;
             cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
         }
-        ;
         this.anchorX = anchorX;
         this.anchorY = anchorY;
         this.cleanUpPreview(grid);
@@ -209,8 +208,8 @@ class PlaceTile {
         cells.forEach(([x, y]) => {
             const cellElement = grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`);
             if (cellElement) {
-                cellElement.classList.add('gfe-cell-preview');
-                cellElement.classList.add(legal ? 'gfe-cell-preview-valid' : 'gfe-cell-preview-illegal');
+                cellElement.classList.add("gfe-cell-preview");
+                cellElement.classList.add(legal ? "gfe-cell-preview-valid" : "gfe-cell-preview-illegal");
             }
         });
         if (!this.placeTileArgs)
@@ -221,11 +220,8 @@ class PlaceTile {
         this.bga.statusBar.removeActionButtons();
         if (!this.placeTileArgs)
             return;
-        const allTiles = [
-            ...this.placeTileArgs.tileOptions,
-            ...this.placeTileArgs.alwaysAvailableTiles,
-        ];
-        allTiles.forEach(tile => {
+        const allTiles = this.pendingTiles.length > 0 ? this.pendingTiles : [...this.placeTileArgs.tileOptions, ...this.placeTileArgs.alwaysAvailableTiles];
+        allTiles.forEach((tile) => {
             this.bga.statusBar.addActionButton(tile, () => {
                 this.tileSelected = tile;
                 this.anchorX = 0;
@@ -235,40 +231,55 @@ class PlaceTile {
                 this.showPreview(grid, tile, 0, 0);
             });
         });
-        this.bga.statusBar.addActionButton('↻', () => {
+        this.bga.statusBar.addActionButton("↻", () => {
             if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
                 return;
             this.rotation = (this.rotation + 90) % 360;
             this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
         });
-        this.bga.statusBar.addActionButton('↺', () => {
+        this.bga.statusBar.addActionButton("↺", () => {
             if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
                 return;
             this.rotation = (this.rotation + 270) % 360;
             this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
         });
-        this.bga.statusBar.addActionButton('↔', () => {
+        this.bga.statusBar.addActionButton("↔", () => {
             if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
                 return;
             this.mirror = !this.mirror;
             this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
         });
         if (legal && this.tileSelected) {
-            this.bga.statusBar.addActionButton('✔', () => {
+            this.bga.statusBar.addActionButton("✔", () => {
                 if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
                     return;
                 const cells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
                 if (!isPlacementLegal(cells, this.bga.gameui.gamedatas))
                     return;
-                this.bga.actions.performAction('actPlaceTile', {
+                const action = this.pendingTiles.length > 0 ? "actPlaceBonusTile" : "actPlaceTile";
+                this.bga.actions.performAction(action, {
                     tileType: this.tileSelected,
                     x: this.anchorX,
                     y: this.anchorY,
                     rotation: this.rotation,
-                    mirror: this.mirror,
+                    mirror: this.mirror
                 });
             });
         }
+    }
+    showBonusButtons(pendingTiles) {
+        this.pendingTiles = pendingTiles;
+        this.resetPlacementState();
+        const playerId = this.bga.players.getCurrentPlayerId();
+        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        if (!grid)
+            return;
+        this.cleanUpPreview(grid);
+        this.bga.statusBar.setTitle(_("${you} must place your bonus tile on the map"));
+        this.updateActionButtons(false, grid);
+    }
+    clearPendingTiles() {
+        this.pendingTiles = [];
     }
     constructor(game, bga) {
         this.game = game;
@@ -277,11 +288,12 @@ class PlaceTile {
         this.placeTileArgs = null;
         this.anchorX = null;
         this.anchorY = null;
+        this.pendingTiles = [];
         this.onGridClick = (event) => {
             const cell = event.target;
             if (!this.tileSelected)
                 return;
-            if (!(cell instanceof HTMLElement) || !cell.classList.contains('gfe-cell'))
+            if (!(cell instanceof HTMLElement) || !cell.classList.contains("gfe-cell"))
                 return;
             const playerId = this.bga.players.getCurrentPlayerId();
             const grid = document.getElementById(`gfe-play-grid-${playerId}`);
@@ -298,22 +310,21 @@ class PlaceTile {
     }
     onEnteringState(args, isCurrentPlayerActive) {
         this.placeTileArgs = args;
+        this.pendingTiles = [];
         //loop over player ids
-        document.querySelectorAll('.gfe-dice-indicator').forEach(el => {
-            el.className = 'gfe-dice-indicator';
+        document.querySelectorAll(".gfe-dice-indicator").forEach((el) => {
+            el.className = "gfe-dice-indicator";
             el.classList.add(`gfe-dice-${args.diceRoll}`);
         });
-        this.bga.statusBar.setTitle(isCurrentPlayerActive ?
-            _('${you} must place your tile on the map') :
-            _('Other players are placing their tile...'));
+        this.bga.statusBar.setTitle(isCurrentPlayerActive ? _("${you} must place your tile on the map") : _("Other players are placing their tile..."));
         if (isCurrentPlayerActive) {
             const playerId = this.bga.players.getCurrentPlayerId();
             const grid = document.getElementById(`gfe-play-grid-${playerId}`);
             if (!grid)
                 return;
-            grid.removeEventListener('click', this.onGridClick);
-            grid.classList.add('gfe-play-grid-interactive');
-            grid.addEventListener('click', this.onGridClick);
+            grid.removeEventListener("click", this.onGridClick);
+            grid.classList.add("gfe-play-grid-interactive");
+            grid.addEventListener("click", this.onGridClick);
             this.updateActionButtons(false, grid);
         }
     }
@@ -326,7 +337,7 @@ class PlaceTile {
         if (!isCurrentPlayerActive) {
             this.bga.statusBar.removeActionButtons();
             this.cleanupActivePlayer();
-            this.bga.statusBar.setTitle(_('Other players are placing their tile...'));
+            this.bga.statusBar.setTitle(_("Other players are placing their tile..."));
             return;
         }
         this.onEnteringState(args, true);
@@ -334,63 +345,192 @@ class PlaceTile {
 }
 
 class PlaceBonus {
+    cleanUpPreview(grid) {
+        grid.querySelectorAll(".gfe-cell-preview").forEach((el) => {
+            el.classList.remove("gfe-cell-preview");
+            el.classList.remove("gfe-cell-preview-valid");
+            el.classList.remove("gfe-cell-preview-illegal");
+        });
+    }
+    showPreview(grid, tileType, anchorX, anchorY) {
+        let cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
+        if (!isInsideGrid(cells)) {
+            const [shiftX, shiftY] = computeTileShift(cells);
+            anchorX += shiftX;
+            anchorY += shiftY;
+            cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
+        }
+        this.anchorX = anchorX;
+        this.anchorY = anchorY;
+        this.cleanUpPreview(grid);
+        const legal = isPlacementLegal(cells, this.bga.gameui.gamedatas);
+        cells.forEach(([x, y]) => {
+            const cellElement = grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`);
+            if (cellElement) {
+                cellElement.classList.add("gfe-cell-preview");
+                cellElement.classList.add(legal ? "gfe-cell-preview-valid" : "gfe-cell-preview-illegal");
+            }
+        });
+        if (!this.placeBonusArgs)
+            return;
+        this.updateActionButtons(legal, grid);
+    }
+    updateActionButtons(legal, grid) {
+        this.bga.statusBar.removeActionButtons();
+        if (!this.placeBonusArgs)
+            return;
+        this.placeBonusArgs.pendingTiles.forEach((tile) => {
+            this.bga.statusBar.addActionButton(tile, () => {
+                this.tileSelected = tile;
+                this.anchorX = 0;
+                this.anchorY = 0;
+                this.rotation = 0;
+                this.mirror = false;
+                this.showPreview(grid, tile, 0, 0);
+            });
+        });
+        this.bga.statusBar.addActionButton("↻", () => {
+            if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
+                return;
+            this.rotation = (this.rotation + 90) % 360;
+            this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        });
+        this.bga.statusBar.addActionButton("↺", () => {
+            if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
+                return;
+            this.rotation = (this.rotation + 270) % 360;
+            this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        });
+        this.bga.statusBar.addActionButton("↔", () => {
+            if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
+                return;
+            this.mirror = !this.mirror;
+            this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        });
+        if (legal && this.tileSelected) {
+            this.bga.statusBar.addActionButton("✔", () => {
+                if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
+                    return;
+                const cells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
+                if (!isPlacementLegal(cells, this.bga.gameui.gamedatas))
+                    return;
+                this.bga.actions.performAction("actPlaceBonusTile", {
+                    tileType: this.tileSelected,
+                    x: this.anchorX,
+                    y: this.anchorY,
+                    rotation: this.rotation,
+                    mirror: this.mirror
+                });
+            });
+        }
+    }
+    resetPlacementState() {
+        this.tileSelected = null;
+        this.anchorX = null;
+        this.anchorY = null;
+        this.rotation = 0;
+        this.mirror = false;
+    }
     constructor(game, bga) {
         this.game = game;
         this.bga = bga;
+        this.tileSelected = null;
+        this.placeBonusArgs = null;
+        this.anchorX = null;
+        this.anchorY = null;
+        this.rotation = 0;
+        this.mirror = false;
+        this.onGridClick = (event) => {
+            const cell = event.target;
+            if (!this.tileSelected)
+                return;
+            if (!(cell instanceof HTMLElement) || !cell.classList.contains("gfe-cell"))
+                return;
+            const playerId = this.bga.players.getCurrentPlayerId();
+            const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+            if (!grid)
+                return;
+            this.anchorX = Number(cell.dataset.x);
+            this.anchorY = Number(cell.dataset.y);
+            if (isNaN(this.anchorX) || isNaN(this.anchorY))
+                return;
+            this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        };
     }
     onEnteringState(args, isCurrentPlayerActive) {
-        this.bga.statusBar.setTitle(isCurrentPlayerActive ?
-            _('${you} must place your bonus tile on the map') :
-            _('Other players are placing their bonus tile...'));
+        this.bga.statusBar.setTitle(isCurrentPlayerActive ? _("${you} must place your bonus tile on the map") : _("Other players are placing their bonus tile..."));
+        this.placeBonusArgs = args;
         if (isCurrentPlayerActive) {
-            // TODO: show bonus tile options and enable grid interaction
-            console.log('Pending bonus tiles:', args.pendingTiles);
+            const playerId = this.bga.players.getCurrentPlayerId();
+            const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+            if (!grid)
+                return;
+            grid.removeEventListener("click", this.onGridClick);
+            grid.classList.add("gfe-play-grid-interactive");
+            grid.addEventListener("click", this.onGridClick);
+            this.updateActionButtons(false, grid);
         }
     }
     onLeavingState(args, isCurrentPlayerActive) {
-        // TODO: clean up tile preview
+        this.cleanupActivePlayer();
+        this.placeBonusArgs = null;
+    }
+    cleanupActivePlayer() {
+        const playerId = this.bga.players.getCurrentPlayerId();
+        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        if (!grid)
+            return;
+        // remove valid/invalid indicators
+        this.cleanUpPreview(grid);
+        grid.classList.remove("gfe-play-grid-interactive");
+        grid.removeEventListener("click", this.onGridClick);
+        // forgets which tile player picked up and where
+        this.resetPlacementState();
     }
     onPlayerActivationChange(args, isCurrentPlayerActive) {
-        this.onEnteringState(args, isCurrentPlayerActive);
+        if (!isCurrentPlayerActive) {
+            this.bga.statusBar.removeActionButtons();
+            this.cleanupActivePlayer();
+            this.bga.statusBar.setTitle(_("Other players are placing their bonus tile..."));
+            return;
+        }
+        this.onEnteringState(args, true);
     }
 }
 
 class Game {
     constructor(bga) {
-        console.log('greetingsfromearth constructor');
+        console.log("greetingsfromearth constructor");
         this.bga = bga;
         // Register state classes — names must match PHP state class names
         this.placeTile = new PlaceTile(this, bga);
         this.placeBonus = new PlaceBonus(this, bga);
-        this.bga.states.register('PlaceTile', this.placeTile);
-        this.bga.states.register('PlaceBonus', this.placeBonus);
+        this.bga.states.register("PlaceTile", this.placeTile);
+        this.bga.states.register("PlaceBonus", this.placeBonus);
     }
     renderCoveredCells(playerId, coveredCells) {
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
         if (!grid)
             return;
-        const cells = Array.isArray(coveredCells)
-            ? coveredCells
-            : Object.values(coveredCells);
+        const cells = Array.isArray(coveredCells) ? coveredCells : Object.values(coveredCells);
         for (const { x, y } of cells) {
-            grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`)
-                ?.classList.add('gfe-cell-placed');
+            grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`)?.classList.add("gfe-cell-placed");
         }
     }
     renderCollectionTrack(playerId, count) {
         const track = document.getElementById(`gfe-collection-track-${playerId}`);
         if (!track)
             return;
-        track.innerHTML = '';
+        track.innerHTML = "";
         for (let i = 0; i < count; i++) {
-            track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.3}%; left: ${11.2 + i * 7.8}%"></div>`;
+            track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.515}%; left: ${11.2 + i * 7.8}%"></div>`;
         }
     }
     setup(gamedatas) {
-        console.log('Starting game setup', gamedatas);
+        console.log("Starting game setup", gamedatas);
         this.gamedatas = gamedatas;
         // Set up the game area
-        this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
+        this.bga.gameArea.getElement().insertAdjacentHTML("beforeend", `
             <div id="gfe-game-area">
                 <div id="gfe-round-info">
                     Round: <span id="gfe-round">${gamedatas.currentRound}</span> / 14
@@ -401,7 +541,7 @@ class Game {
         // Set up player boards
         Object.entries(gamedatas.players).forEach(([pId, player]) => {
             const playerId = Number(pId);
-            document.getElementById('gfe-player-boards').insertAdjacentHTML('beforeend', `
+            document.getElementById("gfe-player-boards").insertAdjacentHTML("beforeend", `
                 <div id="gfe-board-${playerId}" class="gfe-player-board">
                     <strong>${player.name}</strong>
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
@@ -414,7 +554,7 @@ class Game {
             // Set up player's play grid
             const playGridEl = document.getElementById(`gfe-play-grid-${playerId}`);
             if (playGridEl) {
-                let cellsHTML = '';
+                let cellsHTML = "";
                 for (let y = 0; y < 13; y++) {
                     for (let x = 0; x < 18; x++) {
                         cellsHTML += `<div class="gfe-cell" data-x="${x}" data-y="${y}"></div>`;
@@ -428,15 +568,15 @@ class Game {
         this.renderCoveredCells(myId, gamedatas.coveredCells);
         this.renderCollectionTrack(myId, Number(gamedatas.playerState.collection_count));
         this.setupNotifications();
-        console.log('Ending game setup');
+        console.log("Ending game setup");
     }
     setupNotifications() {
-        console.log('notifications subscriptions setup');
+        console.log("notifications subscriptions setup");
         this.bga.notifications.setupPromiseNotifications({});
     }
     async notif_newRound(args) {
-        console.log('New round:', args.round, 'Dice roll:', args.dice_roll);
-        const roundEl = document.getElementById('gfe-round');
+        console.log("New round:", args.round, "Dice roll:", args.dice_roll);
+        const roundEl = document.getElementById("gfe-round");
         if (roundEl)
             roundEl.textContent = String(args.round);
     }
@@ -453,10 +593,36 @@ class Game {
         gamedatas.playerState.last_tile_type = args.tile_type;
         gamedatas.playerState.last_rotation = args.rotation;
         gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
+        const myId = this.bga.players.getCurrentPlayerId();
+        if (args.player_id === myId && args.pending_tiles && args.pending_tiles.length > 0) {
+            this.placeTile.showBonusButtons(args.pending_tiles);
+        }
+        else if (args.player_id === myId) {
+            this.placeTile.clearPendingTiles();
+            this.bga.statusBar.removeActionButtons();
+        }
     }
     async notif_bonusTilePlaced(args) {
-        console.log('Bonus tile placed:', args);
-        // TODO: render the bonus tile on the correct player's grid
+        const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
+        this.renderCoveredCells(args.player_id, cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type })));
+        const gamedatas = this.bga.gameui.gamedatas;
+        cells.forEach(([x, y]) => {
+            gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+        });
+        gamedatas.playerState.has_started = 1;
+        gamedatas.playerState.last_x = args.x;
+        gamedatas.playerState.last_y = args.y;
+        gamedatas.playerState.last_tile_type = args.tile_type;
+        gamedatas.playerState.last_rotation = args.rotation;
+        gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
+        const myId = this.bga.players.getCurrentPlayerId();
+        if (args.player_id === myId && args.pending_tiles && args.pending_tiles.length > 0) {
+            this.placeTile.showBonusButtons(args.pending_tiles);
+        }
+        else if (args.player_id === myId) {
+            this.placeTile.clearPendingTiles();
+            this.bga.statusBar.removeActionButtons();
+        }
     }
     async notif_turnFinalized(args) {
         this.renderCollectionTrack(args.player_id, args.collection_count);
