@@ -91,6 +91,7 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 ---
 
 ## Next — bonus tiles
+- [ ] placement circles on monuments. Shift to collection track.
 - [ ] Server: trigger bonus when covering currywurst / e-scooter
   - [ ] Increment `currywurst_count` / `escooter_count`
   - [ ] Append tile ids (e.g. `I1`, `I2`) to `pending_bonus_tiles`

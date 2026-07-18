@@ -42,7 +42,7 @@ export class Game {
         track.innerHTML = '';
 
         for (let i = 0; i < count; i++) {
-            track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${84.15 + i * 0.1}%; left: ${7.85 + i * 5.7}%"></div>`;
+            track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.3}%; left: ${11.2 + i * 7.8}%"></div>`;
         }
     }
     
