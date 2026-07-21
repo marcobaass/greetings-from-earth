@@ -81,8 +81,8 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 
 - [x] Collection balls: end-of-turn scoring, circles, live score updates
 - [x] Bonus tiles: triggers, server + client (currywurst, e-scooter)
-- [ ] Increment `currywurst_count` / `escooter_count` in `Game::placeBonusTile`
-- [ ] UFO scoring
+- [x] Increment `currywurst_count` / `escooter_count` in `Game::placeBonusTile`
+- [x] UFO scoring
 - [ ] Must-see clusters
 - [ ] Monument surround scoring
 - [ ] Street art / graffiti scoring
@@ -93,9 +93,8 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 
 ## Next — bonus tiles
 
-- [ ] placement circles on monuments. Shift to collection track.
-- [ ] Server: trigger bonus when covering currywurst / e-scooter
-  - [ ] Increment `currywurst_count` / `escooter_count`
+- [x] placement circles on monuments. Shift to collection track.
+- [x] Server: trigger bonus when covering currywurst / e-scooter
   - [ ] Append tile ids (e.g. `I1`, `I2`) to `pending_bonus_tiles`
 - [ ] Server: implement `placeBonusTile` in `Game.php`
   - [ ] Validate placement (reuse `isValidPlacement`)

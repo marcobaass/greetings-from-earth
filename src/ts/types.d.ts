@@ -55,4 +55,5 @@ interface NotifNewRoundArgs {
 interface NotifTurnFinalizedArgs {
   player_id: number;
   collection_count: number;
+  ufo_count: number;
 }

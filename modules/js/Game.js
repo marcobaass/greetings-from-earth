@@ -508,6 +508,7 @@ class Game {
         this.bga.states.register("PlaceTile", this.placeTile);
         this.bga.states.register("PlaceBonus", this.placeBonus);
     }
+    // ===== RENDERING =====
     renderCoveredCells(playerId, coveredCells) {
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
         if (!grid)
@@ -526,6 +527,17 @@ class Game {
             track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.515}%; left: ${11.2 + i * 7.8}%"></div>`;
         }
     }
+    renderUfoTrack(playerId, count) {
+        const track = document.getElementById(`gfe-ufo-track-${playerId}`);
+        if (!track)
+            return;
+        track.innerHTML = "";
+        for (let i = 0; i < count; i++) {
+            track.innerHTML += `<div class="gfe-ufo-track-circle" data-index="${i}" style="top: ${59 + i * -0.315}%; left: ${15.2 + i * 9.8}%"></div>`;
+        }
+    }
+    // ===== GAME SETUP =====
+    // This is called when the game is setup
     setup(gamedatas) {
         console.log("Starting game setup", gamedatas);
         this.gamedatas = gamedatas;
@@ -548,6 +560,7 @@ class Game {
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
                         <div id="gfe-collection-track-${playerId}" class="gfe-collection-track"></div>
+                        <div id="gfe-ufo-track-${playerId}" class="gfe-ufo-track"></div>
                     </div>
                 </div>
             `);
@@ -563,10 +576,11 @@ class Game {
                 playGridEl.innerHTML = cellsHTML;
             }
         });
-        // Set up collection track
+        // Set up tracks and covered cells
         const myId = this.bga.players.getCurrentPlayerId();
         this.renderCoveredCells(myId, gamedatas.coveredCells);
         this.renderCollectionTrack(myId, Number(gamedatas.playerState.collection_count));
+        this.renderUfoTrack(myId, Number(gamedatas.playerState.ufo_count));
         this.setupNotifications();
         console.log("Ending game setup");
     }
@@ -626,6 +640,11 @@ class Game {
     }
     async notif_turnFinalized(args) {
         this.renderCollectionTrack(args.player_id, args.collection_count);
+        this.renderUfoTrack(args.player_id, args.ufo_count);
+        if (args.player_id === this.bga.players.getCurrentPlayerId()) {
+            this.bga.gameui.gamedatas.playerState.collection_count = args.collection_count;
+            this.bga.gameui.gamedatas.playerState.ufo_count = args.ufo_count;
+        }
     }
 }
 
