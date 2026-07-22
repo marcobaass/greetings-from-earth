@@ -340,12 +340,16 @@ class Game extends \Bga\GameFramework\Table {
         $cellKeys = $this->getCellsThisTurn($playerId);
         $this->checkCollectibles($playerId, $cellKeys);
         $this->checkUFOs($playerId, $cellKeys);
+        $this->checkMustSeeClusters($playerId);
         $this->clearCellsThisTurn($playerId);
 
         // get collection and UFO counts
-        $state = $this->getObjectFromDb("SELECT collection_count, ufo_count FROM player_state WHERE player_id = '$playerId'");
+        $state = $this->getObjectFromDb(
+            "SELECT collection_count, ufo_count, mustsee_completed FROM player_state WHERE player_id = '$playerId'"
+        );
         $collectionCount = (int) $state["collection_count"];
         $ufoCount = (int) $state["ufo_count"];
+        $mustseeCompleted = json_decode($state["mustsee_completed"] ?? "[]", true);
 
         // notify all players
         $this->notify->all("turnFinalized", clienttranslate('${player_name} ends their turn'), [
@@ -353,6 +357,7 @@ class Game extends \Bga\GameFramework\Table {
             "player_name" => $this->getPlayerNameById($playerId),
             "collection_count" => $collectionCount,
             "ufo_count" => $ufoCount,
+            "mustsee_completed" => $mustseeCompleted,
         ]);
     }
 
@@ -441,6 +446,53 @@ class Game extends \Bga\GameFramework\Table {
                 $this->playerScore->inc($playerId, $score);
             }
         }
+    }
+
+    // ===== CHECK MUST-SEE CLUSTERS =====
+
+    public function checkMustSeeClusters(int $playerId): void {
+        //load all covered cells for the player
+        $rows = $this->getObjectListFromDB("SELECT `x`, `y`, `tile_type` FROM `player_cells` WHERE `player_id` = '$playerId'");
+
+        $coveredKeys = [];
+        foreach ($rows as $cell) {
+            $coveredKeys[cellKey((int) $cell["x"], (int) $cell["y"])] = true;
+        }
+
+        //load already completed clusters
+        $state = $this->getObjectFromDB("SELECT `mustsee_completed` FROM `player_state` WHERE `player_id` = '$playerId'");
+        $completedClusters = json_decode($state["mustsee_completed"] ?? "[]", true);
+
+        //looping clusters and checking if they are completed
+        foreach (BERLIN_MUSTSEE_CLUSTERS as $clusterId => $clusterCells) {
+            //check if the cluster is already completed
+            if (in_array($clusterId, $completedClusters, true)) {
+                continue;
+            }
+
+            //Check: every [x,y] in the cluster exists in the covered set
+            $allCovered = true;
+            foreach ($clusterCells as [$x, $y]) {
+                if (!isset($coveredKeys[cellKey((int) $x, (int) $y)])) {
+                    $allCovered = false;
+                    break;
+                }
+            }
+
+            if (!$allCovered) {
+                continue;
+            }
+
+            //If all cells are covered, complete the cluster
+            $completedClusters[] = $clusterId;
+            $score = BERLIN_MUSTSEE_SCORES[count($completedClusters) - 1] ?? 0;
+            $this->playerScore->inc($playerId, $score);
+        }
+
+        //update the player state with the completed clusters
+        static::DbQuery(
+            "UPDATE `player_state` SET `mustsee_completed` = '" . json_encode($completedClusters) . "' WHERE `player_id` = '$playerId'"
+        );
     }
 
     // ===== DEBUG HELPERS =====

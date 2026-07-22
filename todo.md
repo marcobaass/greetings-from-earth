@@ -81,9 +81,8 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 
 - [x] Collection balls: end-of-turn scoring, circles, live score updates
 - [x] Bonus tiles: triggers, server + client (currywurst, e-scooter)
-- [x] Increment `currywurst_count` / `escooter_count` in `Game::placeBonusTile`
 - [x] UFO scoring
-- [ ] Must-see clusters
+- [x] Must-see clusters: server `checkMustSeeClusters`, scoring track, client zig-zag UI, `turnFinalized` for all players
 - [ ] Monument surround scoring
 - [ ] Street art / graffiti scoring
 - [ ] implement 'undo'
@@ -95,15 +94,15 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 
 - [x] placement circles on monuments. Shift to collection track.
 - [x] Server: trigger bonus when covering currywurst / e-scooter
-  - [ ] Append tile ids (e.g. `I1`, `I2`) to `pending_bonus_tiles`
-- [ ] Server: implement `placeBonusTile` in `Game.php`
-  - [ ] Validate placement (reuse `isValidPlacement`)
-  - [ ] Insert into `player_cells`, update `last_*`
-  - [ ] Remove one tile from `pending_bonus_tiles`
-  - [ ] Call `addCellsThisTurn` for bonus cells
-- [ ] Flow: in `PlaceBonus`, call `finalizeTurn` when `hasPendingBonusTiles` becomes false
-- [ ] Client: `PlaceBonus.ts` UI
-  - [ ] Show `pendingTiles` as buttons
-  - [ ] Reuse grid preview / rotate / mirror
-  - [ ] Call `actPlaceBonusTile`
-- [ ] Client: `notif_bonusTilePlaced` renders tiles like `notif_tilePlaced`
+  - [x] Append tile ids (e.g. `I1`, `I2`) to `pending_bonus_tiles`
+- [x] Server: implement `placeBonusTile` in `Game.php`
+  - [x] Validate placement (reuse `isValidPlacement`)
+  - [x] Insert into `player_cells`, update `last_*`
+  - [x] Remove one tile from `pending_bonus_tiles`
+  - [x] Call `addCellsThisTurn` for bonus cells
+- [x] Flow: in `PlaceBonus`, call `finalizeTurn` when `hasPendingBonusTiles` becomes false
+- [x] Client: `PlaceBonus.ts` UI
+  - [x] Show `pendingTiles` as buttons
+  - [x] Reuse grid preview / rotate / mirror
+  - [x] Call `actPlaceBonusTile`
+- [x] Client: `notif_bonusTilePlaced` renders tiles like `notif_tilePlaced`

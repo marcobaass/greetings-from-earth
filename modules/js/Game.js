@@ -527,12 +527,21 @@ class Game {
             track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.515}%; left: ${11.2 + i * 7.8}%"></div>`;
         }
     }
-    renderUfoTrack(playerId, count) {
-        const track = document.getElementById(`gfe-ufo-track-${playerId}`);
+    renderMustSeeUfoTrack(playerId, playerState) {
+        const track = document.getElementById(`gfe-ufo-mustsee-track-${playerId}`);
         if (!track)
             return;
+        const completed = JSON.parse(playerState.mustsee_completed || "[]");
+        const mustseeCount = completed.length;
+        const ufoCount = Number(playerState.ufo_count);
         track.innerHTML = "";
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < mustseeCount; i++) {
+            const pair = Math.floor(i / 2);
+            const top = i % 2 === 0 ? 11.9 + pair * -1.7 : 29.2 + pair * -0.35;
+            const left = (i % 2 === 0 ? 14.5 : 19.7) + pair * 10.2;
+            track.innerHTML += `<div class="gfe-mustsee-track-circle" data-index="${i}" style="top: ${top}%; left: ${left}%"></div>`;
+        }
+        for (let i = 0; i < ufoCount; i++) {
             track.innerHTML += `<div class="gfe-ufo-track-circle" data-index="${i}" style="top: ${59 + i * -0.315}%; left: ${15.2 + i * 9.8}%"></div>`;
         }
     }
@@ -560,7 +569,7 @@ class Game {
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
                         <div id="gfe-collection-track-${playerId}" class="gfe-collection-track"></div>
-                        <div id="gfe-ufo-track-${playerId}" class="gfe-ufo-track"></div>
+                        <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
                     </div>
                 </div>
             `);
@@ -580,7 +589,7 @@ class Game {
         const myId = this.bga.players.getCurrentPlayerId();
         this.renderCoveredCells(myId, gamedatas.coveredCells);
         this.renderCollectionTrack(myId, Number(gamedatas.playerState.collection_count));
-        this.renderUfoTrack(myId, Number(gamedatas.playerState.ufo_count));
+        this.renderMustSeeUfoTrack(myId, gamedatas.playerState);
         this.setupNotifications();
         console.log("Ending game setup");
     }
@@ -640,10 +649,11 @@ class Game {
     }
     async notif_turnFinalized(args) {
         this.renderCollectionTrack(args.player_id, args.collection_count);
-        this.renderUfoTrack(args.player_id, args.ufo_count);
         if (args.player_id === this.bga.players.getCurrentPlayerId()) {
             this.bga.gameui.gamedatas.playerState.collection_count = args.collection_count;
             this.bga.gameui.gamedatas.playerState.ufo_count = args.ufo_count;
+            this.bga.gameui.gamedatas.playerState.mustsee_completed = JSON.stringify(args.mustsee_completed);
+            this.renderMustSeeUfoTrack(args.player_id, this.bga.gameui.gamedatas.playerState);
         }
     }
 }
