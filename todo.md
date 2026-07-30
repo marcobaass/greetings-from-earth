@@ -86,7 +86,10 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] UFO scoring
 - [x] Must-see clusters: server `checkMustSeeClusters`, scoring track, client zig-zag UI, `turnFinalized` for all players
 - [x] Monument surround scoring
+- [x] calculation of monument/collection score -> total score added to player score is monument score \* collection score
+- [x] UI show monument/collection score and total score on sheet
 - [ ] Street art / graffiti scoring
+- [ ] Score for all 4 scoring tracks
 - [ ] implement 'undo'
 - [ ] More maps / content
 

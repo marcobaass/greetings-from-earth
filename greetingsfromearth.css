@@ -167,6 +167,15 @@
   border: 4px solid black;
 }
 
+.gfe-collection-score {
+  position: absolute;
+  width: 6%;
+  height: 29%;
+  top: 59.4%;
+  left: 75.9%;
+  transform: rotate(1.5deg);
+}
+
 .gfe-monument-track-circle {
   position: absolute;
   width: 3.9%;
@@ -174,6 +183,32 @@
   border-radius: 50%;
   background: rgba(255, 255, 0, 0.25);
   border: 4px solid black;
+}
+
+.gfe-monument-score {
+  position: absolute;
+  width: 6%;
+  height: 29%;
+  top: 20.4%;
+  left: 75.9%;
+  transform: rotate(1.5deg);
+}
+
+.gfe-monument-collection-score {
+  position: absolute;
+  width: 8%;
+  height: 29%;
+  top: 42%;
+  left: 86.5%;
+  transform: rotate(1.5deg);
+}
+
+.gfe-track-score {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  color: #ad40ad;
+  text-align: center;
 }
 
 /* UFO and Must-see track styles */
@@ -197,6 +232,15 @@
   border: 4px solid black;
 }
 
+.gfe-ufo-score {
+  position: absolute;
+  width: 6%;
+  height: 29%;
+  top: 57.4%;
+  left: 57.9%;
+  transform: rotate(-1.5deg);
+}
+
 .gfe-mustsee-track-circle {
   position: absolute;
   width: 3.4%;
@@ -204,4 +248,21 @@
   border-radius: 50%;
   background: rgba(255, 255, 0, 0.25);
   border: 4px solid black;
+}
+
+.gfe-mustsee-score {
+  position: absolute;
+  width: 6%;
+  height: 29%;
+  top: 14.4%;
+  left: 57.5%;
+  transform: rotate(-1.5deg);
+}
+
+.gfe-track-score-orange {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  color: #de9047;
+  text-align: center;
 }

@@ -518,22 +518,30 @@ class Game {
             grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`)?.classList.add("gfe-cell-placed");
         }
     }
-    renderMonumentCollectionTrack(playerId, monumentCount, collectionCount) {
+    renderMonumentCollectionTrack(playerId, monumentCount, collectionCount, monumentScore, collectionScore, monumentCollectionScore) {
         const track = document.getElementById(`gfe-monument-collection-track-${playerId}`);
         if (!track)
             return;
+        const monumentScoreString = monumentScore.toString();
+        const collectionScoreString = collectionScore.toString();
+        const monumentCollectionScoreString = monumentCollectionScore.toString();
         track.innerHTML = "";
         for (let i = 0; i < monumentCount; i++) {
             track.innerHTML += `<div class="gfe-monument-track-circle" data-index="${i}" style="top: ${17.4 + i * 0.56}%; left: ${11.3 + i * 10.86}%"></div>`;
         }
+        track.innerHTML += `<div class="gfe-monument-score"><p class="gfe-track-score">${monumentScoreString}</p></div>`;
         for (let i = 0; i < collectionCount; i++) {
             track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.515}%; left: ${11.2 + i * 7.8}%"></div>`;
         }
+        track.innerHTML += `<div class="gfe-collection-score"><p class="gfe-track-score">${collectionScoreString}</p></div>`;
+        track.innerHTML += `<div class="gfe-monument-collection-score"><p class="gfe-track-score">${monumentCollectionScoreString}</p></div>`;
     }
-    renderMustSeeUfoTrack(playerId, ufoCount, mustseeCount) {
+    renderMustSeeUfoTrack(playerId, ufoCount, mustseeCount, mustseeScore, ufoScore) {
         const track = document.getElementById(`gfe-ufo-mustsee-track-${playerId}`);
         if (!track)
             return;
+        const mustseeScoreString = mustseeScore.toString();
+        const ufoScoreString = ufoScore.toString();
         track.innerHTML = "";
         for (let i = 0; i < mustseeCount; i++) {
             const pair = Math.floor(i / 2);
@@ -541,9 +549,11 @@ class Game {
             const left = (i % 2 === 0 ? 14.5 : 19.7) + pair * 10.2;
             track.innerHTML += `<div class="gfe-mustsee-track-circle" data-index="${i}" style="top: ${top}%; left: ${left}%"></div>`;
         }
+        track.innerHTML += `<div class="gfe-mustsee-score"><p class="gfe-track-score-orange">${mustseeScoreString}</p></div>`;
         for (let i = 0; i < ufoCount; i++) {
             track.innerHTML += `<div class="gfe-ufo-track-circle" data-index="${i}" style="top: ${59 + i * -0.315}%; left: ${15.2 + i * 9.8}%"></div>`;
         }
+        track.innerHTML += `<div class="gfe-ufo-score"><p class="gfe-track-score-orange">${ufoScoreString}</p></div>`;
     }
     // ===== GAME SETUP =====
     // This is called when the game is setup
@@ -589,9 +599,9 @@ class Game {
         const myId = this.bga.players.getCurrentPlayerId();
         this.renderCoveredCells(myId, gamedatas.coveredCells);
         const monument = JSON.parse(String(gamedatas.playerState.monument_completed || "[]"));
-        this.renderMonumentCollectionTrack(myId, monument.length, Number(gamedatas.playerState.collection_count));
+        this.renderMonumentCollectionTrack(myId, monument.length, Number(gamedatas.playerState.collection_count), Number(gamedatas.playerState.monument_score), Number(gamedatas.playerState.collection_score), Number(gamedatas.playerState.monument_collection_score));
         const mustsee = JSON.parse(String(gamedatas.playerState.mustsee_completed || "[]"));
-        this.renderMustSeeUfoTrack(myId, Number(gamedatas.playerState.ufo_count), mustsee.length);
+        this.renderMustSeeUfoTrack(myId, Number(gamedatas.playerState.ufo_count), mustsee.length, Number(gamedatas.playerState.mustsee_score), Number(gamedatas.playerState.ufo_score));
         this.setupNotifications();
         console.log("Ending game setup");
     }
@@ -608,17 +618,19 @@ class Game {
     async notif_tilePlaced(args) {
         const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
         this.renderCoveredCells(args.player_id, cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type })));
-        const gamedatas = this.bga.gameui.gamedatas;
-        cells.forEach(([x, y]) => {
-            gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
-        });
-        gamedatas.playerState.has_started = 1;
-        gamedatas.playerState.last_x = args.x;
-        gamedatas.playerState.last_y = args.y;
-        gamedatas.playerState.last_tile_type = args.tile_type;
-        gamedatas.playerState.last_rotation = args.rotation;
-        gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
         const myId = this.bga.players.getCurrentPlayerId();
+        if (args.player_id === myId) {
+            const gamedatas = this.bga.gameui.gamedatas;
+            cells.forEach(([x, y]) => {
+                gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+            });
+            gamedatas.playerState.has_started = 1;
+            gamedatas.playerState.last_x = args.x;
+            gamedatas.playerState.last_y = args.y;
+            gamedatas.playerState.last_tile_type = args.tile_type;
+            gamedatas.playerState.last_rotation = args.rotation;
+            gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
+        }
         if (args.player_id === myId && args.pending_tiles && args.pending_tiles.length > 0) {
             this.placeTile.showBonusButtons(args.pending_tiles);
         }
@@ -630,17 +642,19 @@ class Game {
     async notif_bonusTilePlaced(args) {
         const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
         this.renderCoveredCells(args.player_id, cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type })));
-        const gamedatas = this.bga.gameui.gamedatas;
-        cells.forEach(([x, y]) => {
-            gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
-        });
-        gamedatas.playerState.has_started = 1;
-        gamedatas.playerState.last_x = args.x;
-        gamedatas.playerState.last_y = args.y;
-        gamedatas.playerState.last_tile_type = args.tile_type;
-        gamedatas.playerState.last_rotation = args.rotation;
-        gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
         const myId = this.bga.players.getCurrentPlayerId();
+        if (args.player_id === myId) {
+            const gamedatas = this.bga.gameui.gamedatas;
+            cells.forEach(([x, y]) => {
+                gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+            });
+            gamedatas.playerState.has_started = 1;
+            gamedatas.playerState.last_x = args.x;
+            gamedatas.playerState.last_y = args.y;
+            gamedatas.playerState.last_tile_type = args.tile_type;
+            gamedatas.playerState.last_rotation = args.rotation;
+            gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
+        }
         if (args.player_id === myId && args.pending_tiles && args.pending_tiles.length > 0) {
             this.placeTile.showBonusButtons(args.pending_tiles);
         }
@@ -653,16 +667,23 @@ class Game {
         const monument = Array.isArray(args.monument_completed)
             ? args.monument_completed
             : JSON.parse(String(args.monument_completed || "[]"));
-        this.renderMonumentCollectionTrack(args.player_id, monument.length, args.collection_count);
+        this.renderMonumentCollectionTrack(args.player_id, monument.length, args.collection_count, args.monument_score, args.collection_score, args.monument_collection_score);
         const mustsee = Array.isArray(args.mustsee_completed)
             ? args.mustsee_completed
             : JSON.parse(String(args.mustsee_completed || "[]"));
-        this.renderMustSeeUfoTrack(args.player_id, Number(args.ufo_count), mustsee.length);
+        this.renderMustSeeUfoTrack(args.player_id, args.ufo_count, mustsee.length, args.mustsee_score, args.ufo_score);
         // Only sync local gamedatas for yourself
         if (args.player_id === this.bga.players.getCurrentPlayerId()) {
-            this.bga.gameui.gamedatas.playerState.collection_count = args.collection_count;
-            this.bga.gameui.gamedatas.playerState.ufo_count = args.ufo_count;
-            this.bga.gameui.gamedatas.playerState.mustsee_completed = JSON.stringify(mustsee);
+            const ps = this.bga.gameui.gamedatas.playerState;
+            ps.collection_count = args.collection_count;
+            ps.collection_score = args.collection_score;
+            ps.ufo_count = args.ufo_count;
+            ps.ufo_score = args.ufo_score;
+            ps.mustsee_completed = JSON.stringify(mustsee);
+            ps.mustsee_score = args.mustsee_score;
+            ps.monument_completed = JSON.stringify(monument);
+            ps.monument_score = args.monument_score;
+            ps.monument_collection_score = args.monument_collection_score;
         }
     }
 }

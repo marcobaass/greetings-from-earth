@@ -15,11 +15,16 @@ interface GreetingsFromEarthGamedatas extends Gamedatas<GreetingsFromEarthPlayer
     currywurst_count: number;
     escooter_count: number;
     ufo_count: number;
+    ufo_score: number;
     collection_count: number;
+    collection_score: number;
     monument_count: number;
+    monument_score: number;
+    monument_collection_score: number;
     street_art_progress: number;
     pending_bonus_tiles: string;
     mustsee_completed: string;
+    mustsee_score: number;
     monument_completed: string;
     cells_this_turn: string;
   };
@@ -56,7 +61,12 @@ interface NotifNewRoundArgs {
 interface NotifTurnFinalizedArgs {
   player_id: number;
   collection_count: number;
+  collection_score: number;
   ufo_count: number;
+  ufo_score: number;
   mustsee_completed: string[];
+  mustsee_score: number;
   monument_completed: string[];
+  monument_score: number;
+  monument_collection_score: number;
 }

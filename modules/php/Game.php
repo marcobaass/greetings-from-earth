@@ -338,15 +338,15 @@ class Game extends \Bga\GameFramework\Table {
     // This is called when a player ends their turn
     public function finalizeTurn(int $playerId): void {
         $cellKeys = $this->getCellsThisTurn($playerId);
+        $this->checkMonumentSurround($playerId);
         $this->checkCollectibles($playerId, $cellKeys);
         $this->checkUFOs($playerId, $cellKeys);
         $this->checkMustSeeClusters($playerId);
         $this->clearCellsThisTurn($playerId);
-        $this->checkMonumentSurround($playerId, $cellKeys);
 
         // get collection and UFO counts
         $state = $this->getObjectFromDb(
-            "SELECT collection_count, ufo_count, mustsee_completed, monument_completed FROM player_state WHERE player_id = '$playerId'"
+            "SELECT collection_count, collection_score, ufo_count, ufo_score, mustsee_completed, mustsee_score, monument_completed, monument_score, monument_collection_score FROM player_state WHERE player_id = '$playerId'"
         );
         $collectionCount = (int) $state["collection_count"];
         $ufoCount = (int) $state["ufo_count"];
@@ -357,11 +357,77 @@ class Game extends \Bga\GameFramework\Table {
         $this->notify->all("turnFinalized", clienttranslate('${player_name} ends their turn'), [
             "player_id" => $playerId,
             "player_name" => $this->getPlayerNameById($playerId),
-            "collection_count" => $collectionCount,
-            "ufo_count" => $ufoCount,
-            "mustsee_completed" => $mustseeCompleted,
-            "monument_completed" => $monumentCompleted,
+            "collection_count" => (int) $state["collection_count"],
+            "collection_score" => (int) $state["collection_score"],
+            "ufo_count" => (int) $state["ufo_count"],
+            "ufo_score" => (int) $state["ufo_score"],
+            "mustsee_completed" => json_decode($state["mustsee_completed"] ?? "[]", true),
+            "mustsee_score" => (int) $state["mustsee_score"],
+            "monument_completed" => json_decode($state["monument_completed"] ?? "[]", true),
+            "monument_score" => (int) $state["monument_score"],
+            "monument_collection_score" => (int) $state["monument_collection_score"],
         ]);
+    }
+
+    // ===== CHECK MONUMENT SURROUND =====
+
+    public function checkMonumentSurround(int $playerId): void {
+        //load all covered cells for the player
+        $rows = $this->getObjectListFromDB("SELECT `x`, `y`, `tile_type` FROM `player_cells` WHERE `player_id` = '$playerId'");
+
+        $coveredKeys = [];
+        foreach ($rows as $cell) {
+            $coveredKeys[cellKey((int) $cell["x"], (int) $cell["y"])] = true;
+        }
+
+        //load already completed clusters
+        $state = $this->getObjectFromDB("SELECT `monument_completed` FROM `player_state` WHERE `player_id` = '$playerId'");
+        $completedClusters = json_decode($state["monument_completed"] ?? "[]", true) ?? [];
+        $previousCount = count($completedClusters);
+
+        //looping clusters and checking if they are completed
+        foreach (BERLIN_MONUMENT_CLUSTERS as $clusterId => $clusterCells) {
+            //check if the cluster is already completed
+            if (in_array($clusterId, $completedClusters, true)) {
+                continue;
+            }
+
+            //Check: every [x,y] in the cluster exists in the covered set
+            $allCovered = true;
+            foreach ($clusterCells as [$x, $y]) {
+                if (!isset($coveredKeys[cellKey((int) $x, (int) $y)])) {
+                    $allCovered = false;
+                    break;
+                }
+            }
+
+            if (!$allCovered) {
+                continue;
+            }
+
+            //If all cells are covered, complete the cluster
+            $completedClusters[] = $clusterId;
+        }
+
+        if ($previousCount === count($completedClusters)) {
+            return;
+        }
+
+        $monumentScore = 0;
+        for ($i = 0; $i < count($completedClusters); $i++) {
+            $monumentScore += BERLIN_MONUMENT_SCORES[$i] ?? 0;
+        }
+
+        //update the player state with the completed clusters
+        static::DbQuery(
+            "UPDATE `player_state`
+            SET `monument_completed` = '" .
+                json_encode($completedClusters) .
+                "',
+                `monument_score` = $monumentScore
+            WHERE `player_id` = '$playerId'"
+        );
+        $this->calculateMonumentCollectionScore($playerId);
     }
 
     // ===== CHECK COLLECTIBLES =====
@@ -378,15 +444,39 @@ class Game extends \Bga\GameFramework\Table {
                 $count = (int) $state["collection_count"];
 
                 $newCount = $count + 1;
+                $newCollectionScore = $newCount * 2;
 
                 static::DbQuery(
-                    "UPDATE `player_state` SET `collection_count` = $newCount
+                    "UPDATE `player_state`
+                     SET `collection_count` = $newCount,
+                         `collection_score` = $newCollectionScore
                      WHERE `player_id` = '$playerId'"
                 );
-
-                // increment player score
-                $this->playerScore->inc($playerId, 2);
+                $this->calculateMonumentCollectionScore($playerId);
             }
+        }
+    }
+
+    // ===== Calculate Monument Collection Score =====
+
+    public function calculateMonumentCollectionScore(int $playerId): void {
+        $state = $this->getObjectFromDb(
+            "SELECT `collection_score`, `monument_score`, `monument_collection_score` FROM `player_state`
+             WHERE `player_id` = '$playerId'"
+        );
+        $monumentCollectionScore = (int) $state["monument_collection_score"];
+        $collectionScore = (int) $state["collection_score"];
+        $monumentScore = (int) $state["monument_score"];
+
+        $newMonumentCollectionScore = $collectionScore * $monumentScore;
+
+        if ($monumentCollectionScore !== $newMonumentCollectionScore) {
+            static::DbQuery(
+                "UPDATE `player_state`
+                     SET `monument_collection_score` = $newMonumentCollectionScore
+                     WHERE `player_id` = '$playerId'"
+            );
+            $this->playerScore->inc($playerId, $newMonumentCollectionScore - $monumentCollectionScore);
         }
     }
 
@@ -426,6 +516,12 @@ class Game extends \Bga\GameFramework\Table {
     // ===== CHECK UFOs =====
 
     public function checkUFOs(int $playerId, array $cellKeys): void {
+        $state = $this->getObjectFromDb(
+            "SELECT `ufo_score` FROM `player_state`
+             WHERE `player_id` = '$playerId'"
+        );
+        $previousUfoScore = (int) $state["ufo_score"];
+
         foreach ($cellKeys as $cellKey) {
             list($x, $y) = explode(",", $cellKey);
             $type = getCellType((int) $x, (int) $y);
@@ -437,16 +533,21 @@ class Game extends \Bga\GameFramework\Table {
                 $count = (int) $state["ufo_count"];
 
                 $newCount = $count + 1;
+                $score = BERLIN_UFO_SCORES[$newCount - 1];
+
+                $newUfoScore = $previousUfoScore + $score;
 
                 static::DbQuery(
-                    "UPDATE `player_state` SET `ufo_count` = $newCount
-                         WHERE `player_id` = '$playerId'"
+                    "UPDATE `player_state` 
+                    SET `ufo_count` = $newCount,
+                        `ufo_score` = $newUfoScore
+                    WHERE `player_id` = '$playerId'"
                 );
-
-                $score = BERLIN_UFO_SCORES[$newCount - 1];
 
                 // increment player score
                 $this->playerScore->inc($playerId, $score);
+
+                $previousUfoScore = $newUfoScore;
             }
         }
     }
@@ -454,6 +555,12 @@ class Game extends \Bga\GameFramework\Table {
     // ===== CHECK MUST-SEE CLUSTERS =====
 
     public function checkMustSeeClusters(int $playerId): void {
+        $state = $this->getObjectFromDb(
+            "SELECT `mustsee_score` FROM `player_state`
+             WHERE `player_id` = '$playerId'"
+        );
+        $previousMustseeScore = (int) $state["mustsee_score"];
+
         //load all covered cells for the player
         $rows = $this->getObjectListFromDB("SELECT `x`, `y`, `tile_type` FROM `player_cells` WHERE `player_id` = '$playerId'");
 
@@ -464,7 +571,8 @@ class Game extends \Bga\GameFramework\Table {
 
         //load already completed clusters
         $state = $this->getObjectFromDB("SELECT `mustsee_completed` FROM `player_state` WHERE `player_id` = '$playerId'");
-        $completedClusters = json_decode($state["mustsee_completed"] ?? "[]", true);
+        $completedClusters = json_decode($state["mustsee_completed"] ?? "[]", true) ?? [];
+        $previousCount = count($completedClusters);
 
         //looping clusters and checking if they are completed
         foreach (BERLIN_MUSTSEE_CLUSTERS as $clusterId => $clusterCells) {
@@ -488,60 +596,25 @@ class Game extends \Bga\GameFramework\Table {
 
             //If all cells are covered, complete the cluster
             $completedClusters[] = $clusterId;
-            $score = BERLIN_MUSTSEE_SCORES[count($completedClusters) - 1] ?? 0;
+            $newCount = count($completedClusters);
+            $score = BERLIN_MUSTSEE_SCORES[$newCount - 1] ?? 0;
+            $newMustseeScore = $previousMustseeScore + $score;
             $this->playerScore->inc($playerId, $score);
+
+            $previousMustseeScore = $newMustseeScore;
+        }
+
+        if (count($completedClusters) === $previousCount) {
+            return;
         }
 
         //update the player state with the completed clusters
         static::DbQuery(
-            "UPDATE `player_state` SET `mustsee_completed` = '" . json_encode($completedClusters) . "' WHERE `player_id` = '$playerId'"
-        );
-    }
-
-    // ===== CHECK MONUMENT SURROUND =====
-
-    public function checkMonumentSurround(int $playerId): void {
-        //load all covered cells for the player
-        $rows = $this->getObjectListFromDB("SELECT `x`, `y`, `tile_type` FROM `player_cells` WHERE `player_id` = '$playerId'");
-
-        $coveredKeys = [];
-        foreach ($rows as $cell) {
-            $coveredKeys[cellKey((int) $cell["x"], (int) $cell["y"])] = true;
-        }
-
-        //load already completed clusters
-        $state = $this->getObjectFromDB("SELECT `monument_completed` FROM `player_state` WHERE `player_id` = '$playerId'");
-        $completedClusters = json_decode($state["monument_completed"] ?? "[]", true);
-
-        //looping clusters and checking if they are completed
-        foreach (BERLIN_MONUMENT_CLUSTERS as $clusterId => $clusterCells) {
-            //check if the cluster is already completed
-            if (in_array($clusterId, $completedClusters, true)) {
-                continue;
-            }
-
-            //Check: every [x,y] in the cluster exists in the covered set
-            $allCovered = true;
-            foreach ($clusterCells as [$x, $y]) {
-                if (!isset($coveredKeys[cellKey((int) $x, (int) $y)])) {
-                    $allCovered = false;
-                    break;
-                }
-            }
-
-            if (!$allCovered) {
-                continue;
-            }
-
-            //If all cells are covered, complete the cluster
-            $completedClusters[] = $clusterId;
-            $score = BERLIN_MONUMENT_SCORES[count($completedClusters) - 1] ?? 0;
-            $this->playerScore->inc($playerId, $score);
-        }
-
-        //update the player state with the completed clusters
-        static::DbQuery(
-            "UPDATE `player_state` SET `monument_completed` = '" . json_encode($completedClusters) . "' WHERE `player_id` = '$playerId'"
+            "UPDATE `player_state` SET `mustsee_completed` = '" .
+                json_encode($completedClusters) .
+                "', 
+            `mustsee_score` = $newMustseeScore
+            WHERE `player_id` = '$playerId'"
         );
     }
 
