@@ -73,7 +73,9 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 
 - [ ] Valid-placement hint: highlight where a tile may legally touch (S-Bahn on first turn; last tile + S-Bahn later)
 - [ ] SVG preview overlay (replace or layer on CSS cells)
-- [ ] Optional: ring controls on board (Ark Nova style)
+- [ ] SVG scribbled circles on tracks
+- [ ] ring controls on board (Ark Nova style)
+- [ ] Soundeffects
 
 ---
 
@@ -83,7 +85,7 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] Bonus tiles: triggers, server + client (currywurst, e-scooter)
 - [x] UFO scoring
 - [x] Must-see clusters: server `checkMustSeeClusters`, scoring track, client zig-zag UI, `turnFinalized` for all players
-- [ ] Monument surround scoring
+- [x] Monument surround scoring
 - [ ] Street art / graffiti scoring
 - [ ] implement 'undo'
 - [ ] More maps / content

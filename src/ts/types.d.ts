@@ -20,6 +20,7 @@ interface GreetingsFromEarthGamedatas extends Gamedatas<GreetingsFromEarthPlayer
     street_art_progress: number;
     pending_bonus_tiles: string;
     mustsee_completed: string;
+    monument_completed: string;
     cells_this_turn: string;
   };
 }
@@ -57,4 +58,5 @@ interface NotifTurnFinalizedArgs {
   collection_count: number;
   ufo_count: number;
   mustsee_completed: string[];
+  monument_completed: string[];
 }

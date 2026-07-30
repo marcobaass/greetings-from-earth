@@ -146,9 +146,9 @@
   border: 1px solid #333;
 }
 
-/* Collection track styles */
+/* Monument and Collection track styles */
 
-.gfe-collection-track {
+.gfe-monument-collection-track {
   position: absolute;
   top: 82%;
   left: 2%;
@@ -159,6 +159,15 @@
 }
 
 .gfe-collection-track-circle {
+  position: absolute;
+  width: 3.9%;
+  height: 19.7%;
+  border-radius: 50%;
+  background: rgba(255, 255, 0, 0.25);
+  border: 4px solid black;
+}
+
+.gfe-monument-track-circle {
   position: absolute;
   width: 3.9%;
   height: 19.7%;

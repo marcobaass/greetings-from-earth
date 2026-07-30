@@ -518,22 +518,22 @@ class Game {
             grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`)?.classList.add("gfe-cell-placed");
         }
     }
-    renderCollectionTrack(playerId, count) {
-        const track = document.getElementById(`gfe-collection-track-${playerId}`);
+    renderMonumentCollectionTrack(playerId, monumentCount, collectionCount) {
+        const track = document.getElementById(`gfe-monument-collection-track-${playerId}`);
         if (!track)
             return;
         track.innerHTML = "";
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < monumentCount; i++) {
+            track.innerHTML += `<div class="gfe-monument-track-circle" data-index="${i}" style="top: ${17.4 + i * 0.56}%; left: ${11.3 + i * 10.86}%"></div>`;
+        }
+        for (let i = 0; i < collectionCount; i++) {
             track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.515}%; left: ${11.2 + i * 7.8}%"></div>`;
         }
     }
-    renderMustSeeUfoTrack(playerId, playerState) {
+    renderMustSeeUfoTrack(playerId, ufoCount, mustseeCount) {
         const track = document.getElementById(`gfe-ufo-mustsee-track-${playerId}`);
         if (!track)
             return;
-        const completed = JSON.parse(playerState.mustsee_completed || "[]");
-        const mustseeCount = completed.length;
-        const ufoCount = Number(playerState.ufo_count);
         track.innerHTML = "";
         for (let i = 0; i < mustseeCount; i++) {
             const pair = Math.floor(i / 2);
@@ -568,7 +568,7 @@ class Game {
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
-                        <div id="gfe-collection-track-${playerId}" class="gfe-collection-track"></div>
+                        <div id="gfe-monument-collection-track-${playerId}" class="gfe-monument-collection-track"></div>
                         <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
                     </div>
                 </div>
@@ -588,8 +588,10 @@ class Game {
         // Set up tracks and covered cells
         const myId = this.bga.players.getCurrentPlayerId();
         this.renderCoveredCells(myId, gamedatas.coveredCells);
-        this.renderCollectionTrack(myId, Number(gamedatas.playerState.collection_count));
-        this.renderMustSeeUfoTrack(myId, gamedatas.playerState);
+        const monument = JSON.parse(String(gamedatas.playerState.monument_completed || "[]"));
+        this.renderMonumentCollectionTrack(myId, monument.length, Number(gamedatas.playerState.collection_count));
+        const mustsee = JSON.parse(String(gamedatas.playerState.mustsee_completed || "[]"));
+        this.renderMustSeeUfoTrack(myId, Number(gamedatas.playerState.ufo_count), mustsee.length);
         this.setupNotifications();
         console.log("Ending game setup");
     }
@@ -648,12 +650,19 @@ class Game {
         }
     }
     async notif_turnFinalized(args) {
-        this.renderCollectionTrack(args.player_id, args.collection_count);
+        const monument = Array.isArray(args.monument_completed)
+            ? args.monument_completed
+            : JSON.parse(String(args.monument_completed || "[]"));
+        this.renderMonumentCollectionTrack(args.player_id, monument.length, args.collection_count);
+        const mustsee = Array.isArray(args.mustsee_completed)
+            ? args.mustsee_completed
+            : JSON.parse(String(args.mustsee_completed || "[]"));
+        this.renderMustSeeUfoTrack(args.player_id, Number(args.ufo_count), mustsee.length);
+        // Only sync local gamedatas for yourself
         if (args.player_id === this.bga.players.getCurrentPlayerId()) {
             this.bga.gameui.gamedatas.playerState.collection_count = args.collection_count;
             this.bga.gameui.gamedatas.playerState.ufo_count = args.ufo_count;
-            this.bga.gameui.gamedatas.playerState.mustsee_completed = JSON.stringify(args.mustsee_completed);
-            this.renderMustSeeUfoTrack(args.player_id, this.bga.gameui.gamedatas.playerState);
+            this.bga.gameui.gamedatas.playerState.mustsee_completed = JSON.stringify(mustsee);
         }
     }
 }

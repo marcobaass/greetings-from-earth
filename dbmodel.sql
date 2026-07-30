@@ -55,10 +55,10 @@ CREATE TABLE IF NOT EXISTS `player_state` (
     `escooter_count`        TINYINT(2)      NOT NULL DEFAULT 0,
     `ufo_count`             TINYINT(2)      NOT NULL DEFAULT 0,
     `collection_count`      TINYINT(2)      NOT NULL DEFAULT 0,
-    `monument_count`        TINYINT(2)      NOT NULL DEFAULT 0,
     `street_art_progress`   TINYINT(2)      NOT NULL DEFAULT 0,
     `pending_bonus_tiles`   VARCHAR(128)    NOT NULL DEFAULT '[]',
     `mustsee_completed`     VARCHAR(32)     NOT NULL DEFAULT '[]',
+    `monument_completed`    VARCHAR(32)     NOT NULL DEFAULT '[]',
     `cells_this_turn`        VARCHAR(128)    NOT NULL DEFAULT '[]',
     PRIMARY KEY (`player_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

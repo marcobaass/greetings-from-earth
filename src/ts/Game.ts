@@ -34,13 +34,17 @@ export class Game {
     }
   }
 
-  private renderCollectionTrack(playerId: number, count: number): void {
-    const track = document.getElementById(`gfe-collection-track-${playerId}`);
+  private renderMonumentCollectionTrack(playerId: number, monumentCount: number, collectionCount: number): void {
+    const track = document.getElementById(`gfe-monument-collection-track-${playerId}`);
     if (!track) return;
 
     track.innerHTML = "";
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < monumentCount; i++) {
+      track.innerHTML += `<div class="gfe-monument-track-circle" data-index="${i}" style="top: ${17.4 + i * 0.56}%; left: ${11.3 + i * 10.86}%"></div>`;
+    }
+
+    for (let i = 0; i < collectionCount; i++) {
       track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.515}%; left: ${11.2 + i * 7.8}%"></div>`;
     }
   }
@@ -94,7 +98,7 @@ export class Game {
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
-                        <div id="gfe-collection-track-${playerId}" class="gfe-collection-track"></div>
+                        <div id="gfe-monument-collection-track-${playerId}" class="gfe-monument-collection-track"></div>
                         <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
                     </div>
                 </div>
@@ -119,7 +123,8 @@ export class Game {
     const myId = this.bga.players.getCurrentPlayerId();
 
     this.renderCoveredCells(myId, gamedatas.coveredCells);
-    this.renderCollectionTrack(myId, Number(gamedatas.playerState.collection_count));
+    const monument = JSON.parse(String(gamedatas.playerState.monument_completed || "[]")) as string[];
+    this.renderMonumentCollectionTrack(myId, monument.length, Number(gamedatas.playerState.collection_count));
     const mustsee = JSON.parse(String(gamedatas.playerState.mustsee_completed || "[]")) as string[];
     this.renderMustSeeUfoTrack(myId, Number(gamedatas.playerState.ufo_count), mustsee.length);
 
@@ -146,20 +151,23 @@ export class Game {
       cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type }))
     );
 
-    const gamedatas = this.bga.gameui.gamedatas;
-
-    cells.forEach(([x, y]) => {
-      gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
-    });
-
-    gamedatas.playerState.has_started = 1;
-    gamedatas.playerState.last_x = args.x;
-    gamedatas.playerState.last_y = args.y;
-    gamedatas.playerState.last_tile_type = args.tile_type;
-    gamedatas.playerState.last_rotation = args.rotation;
-    gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
-
     const myId = this.bga.players.getCurrentPlayerId();
+
+    if (args.player_id === myId) {
+      const gamedatas = this.bga.gameui.gamedatas;
+
+      cells.forEach(([x, y]) => {
+        gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+      });
+
+      gamedatas.playerState.has_started = 1;
+      gamedatas.playerState.last_x = args.x;
+      gamedatas.playerState.last_y = args.y;
+      gamedatas.playerState.last_tile_type = args.tile_type;
+      gamedatas.playerState.last_rotation = args.rotation;
+      gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
+    }
+
     if (args.player_id === myId && args.pending_tiles && args.pending_tiles.length > 0) {
       this.placeTile.showBonusButtons(args.pending_tiles);
     } else if (args.player_id === myId) {
@@ -176,20 +184,23 @@ export class Game {
       cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type }))
     );
 
-    const gamedatas = this.bga.gameui.gamedatas;
-
-    cells.forEach(([x, y]) => {
-      gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
-    });
-
-    gamedatas.playerState.has_started = 1;
-    gamedatas.playerState.last_x = args.x;
-    gamedatas.playerState.last_y = args.y;
-    gamedatas.playerState.last_tile_type = args.tile_type;
-    gamedatas.playerState.last_rotation = args.rotation;
-    gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
-
     const myId = this.bga.players.getCurrentPlayerId();
+
+    if (args.player_id === myId) {
+      const gamedatas = this.bga.gameui.gamedatas;
+
+      cells.forEach(([x, y]) => {
+        gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+      });
+
+      gamedatas.playerState.has_started = 1;
+      gamedatas.playerState.last_x = args.x;
+      gamedatas.playerState.last_y = args.y;
+      gamedatas.playerState.last_tile_type = args.tile_type;
+      gamedatas.playerState.last_rotation = args.rotation;
+      gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
+    }
+
     if (args.player_id === myId && args.pending_tiles && args.pending_tiles.length > 0) {
       this.placeTile.showBonusButtons(args.pending_tiles);
     } else if (args.player_id === myId) {
@@ -199,13 +210,16 @@ export class Game {
   }
 
   async notif_turnFinalized(args: NotifTurnFinalizedArgs) {
-    this.renderCollectionTrack(args.player_id, args.collection_count);
+    const monument = Array.isArray(args.monument_completed)
+      ? args.monument_completed
+      : (JSON.parse(String(args.monument_completed || "[]")) as string[]);
+
+    this.renderMonumentCollectionTrack(args.player_id, monument.length, args.collection_count);
 
     const mustsee = Array.isArray(args.mustsee_completed)
       ? args.mustsee_completed
       : (JSON.parse(String(args.mustsee_completed || "[]")) as string[]);
 
-    // Always draw the finishing player's track (you or opponent)
     this.renderMustSeeUfoTrack(args.player_id, Number(args.ufo_count), mustsee.length);
 
     // Only sync local gamedatas for yourself
