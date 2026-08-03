@@ -171,6 +171,14 @@ export class PlaceTile {
     this.pendingTiles = [];
   }
 
+  public showStreetArtChoose() {
+    this.clearPendingTiles();
+    this.resetPlacementState();
+
+    this.bga.statusBar.setTitle(_("${you} must mark a street art bonus"));
+    this.bga.statusBar.removeActionButtons();
+  }
+
   constructor(
     private game: Game,
     private bga: Bga<GreetingsFromEarthPlayer, GreetingsFromEarthGamedatas>

@@ -51,6 +51,10 @@ class PlaceTile extends GameState {
 
         $this->game->placeTile($currentPlayerId, $tileType, $x, $y, $rotation, $mirror);
 
+        $state = $this->game->getObjectFromDb(
+            "SELECT street_art_pending, street_art_completed FROM player_state WHERE player_id = '$currentPlayerId'"
+        );
+
         $this->notify->all("tilePlaced", clienttranslate('${player_name} places a ${tile_type} tile'), [
             "player_id" => $currentPlayerId,
             "player_name" => $this->game->getPlayerNameById($currentPlayerId),
@@ -60,11 +64,13 @@ class PlaceTile extends GameState {
             "rotation" => $rotation,
             "mirror" => $mirror,
             "pending_tiles" => $this->game->getPendingBonusTiles($currentPlayerId),
+            "street_art_pending" => (int) $state["street_art_pending"],
+            "street_art_completed" => json_decode($state["street_art_completed"] ?? "[]", true) ?? [],
         ]);
 
-        // Still bonus tiles to place? Stay active — turn not over yet
-        if ($this->game->hasPendingBonusTiles($currentPlayerId)) {
-            return null;
+        // after place + notify (include street_art_pending in notif args)
+        if (!$this->game->finishPlacementOrWait($currentPlayerId)) {
+            return null; // stay active
         }
 
         // Nothing left to place — end this player's turn
@@ -80,6 +86,11 @@ class PlaceTile extends GameState {
             throw new UserException("Invalid bonus tile choice");
         }
         $this->game->placeBonusTile($currentPlayerId, $tileType, $x, $y, $rotation, $mirror);
+
+        $state = $this->game->getObjectFromDb(
+            "SELECT street_art_pending, street_art_completed FROM player_state WHERE player_id = '$currentPlayerId'"
+        );
+
         $this->notify->all("bonusTilePlaced", clienttranslate('${player_name} places a bonus ${tile_type} tile'), [
             "player_id" => $currentPlayerId,
             "player_name" => $this->game->getPlayerNameById($currentPlayerId),
@@ -89,10 +100,44 @@ class PlaceTile extends GameState {
             "rotation" => $rotation,
             "mirror" => $mirror,
             "pending_tiles" => $this->game->getPendingBonusTiles($currentPlayerId),
+            "street_art_pending" => (int) $state["street_art_pending"],
+            "street_art_completed" => json_decode($state["street_art_completed"] ?? "[]", true) ?? [],
         ]);
-        if ($this->game->hasPendingBonusTiles($currentPlayerId)) {
+
+        if (!$this->game->finishPlacementOrWait($currentPlayerId)) {
             return null;
         }
+
+        $this->game->finalizeTurn($currentPlayerId);
+        $this->gamestate->setPlayerNonMultiactive($currentPlayerId, NewRound::class);
+        return null;
+    }
+
+    #[PossibleAction]
+    public function actChooseStreetArt(int $currentPlayerId, int $x, int $y): string|null {
+        $this->game->chooseStreetArtCell($currentPlayerId, $x, $y);
+
+        $state = $this->game->getObjectFromDb(
+            "SELECT `street_art_score`, `street_art_completed`, street_art_pending
+            FROM `player_state`
+            WHERE `player_id` = '$currentPlayerId'"
+        );
+
+        $this->notify->all("streetArtChosen", clienttranslate('${player_name} marks a street art cell'), [
+            "player_id" => $currentPlayerId,
+            "player_name" => $this->game->getPlayerNameById($currentPlayerId),
+            "x" => $x,
+            "y" => $y,
+            "street_art_pending" => (int) $state["street_art_pending"],
+            "street_art_completed" => json_decode($state["street_art_completed"] ?? "[]", true) ?? [],
+            "street_art_score" => (int) $state["street_art_score"],
+            "pending_tiles" => $this->game->getPendingBonusTiles($currentPlayerId),
+        ]);
+
+        if (!$this->game->finishPlacementOrWait($currentPlayerId)) {
+            return null;
+        }
+
         $this->game->finalizeTurn($currentPlayerId);
         $this->gamestate->setPlayerNonMultiactive($currentPlayerId, NewRound::class);
         return null;

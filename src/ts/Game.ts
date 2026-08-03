@@ -124,8 +124,12 @@ export class Game {
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
                         <div id="gfe-monument-collection-track-${playerId}" class="gfe-monument-collection-track"></div>
                         <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
+                        
+                        <div id="gfe-street-art-choose-${playerId}" class="gfe-street-art-choose"></div>
                     </div>
+                    
                 </div>
+
             `
       );
 
@@ -139,6 +143,18 @@ export class Game {
           }
         }
         playGridEl.innerHTML = cellsHTML;
+      }
+
+      // Set up street art grid
+      const streetArtGridEl = document.getElementById(`gfe-street-art-choose-${playerId}`);
+      if (streetArtGridEl) {
+        let cellsHTML = "";
+        for (let y = 0; y < 5; y++) {
+          for (let x = 0; x < 4; x++) {
+            cellsHTML += `<div class="gfe-street-art-choose-cell" data-x="${x}" data-y="${y}"></div>`;
+          }
+        }
+        streetArtGridEl.innerHTML = cellsHTML;
       }
     });
 
@@ -180,6 +196,25 @@ export class Game {
     if (roundEl) roundEl.textContent = String(args.round);
   }
 
+  // ===== Helper functions =====
+
+  private continueAfterPlacement(playerId: number, streetArtPending: number, pendingTiles: string[]) {
+    const myId = this.bga.players.getCurrentPlayerId();
+    if (playerId !== myId) return;
+    if (streetArtPending > 0) {
+      this.placeTile.showStreetArtChoose();
+      return;
+    }
+    if (pendingTiles.length > 0) {
+      this.placeTile.showBonusButtons(pendingTiles);
+      return;
+    }
+    this.placeTile.clearPendingTiles();
+    this.bga.statusBar.removeActionButtons();
+  }
+
+  // ===== NOTIFICATIONS =====
+
   async notif_tilePlaced(args: NotifTilePlacedArgs) {
     const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
 
@@ -205,12 +240,7 @@ export class Game {
       gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
     }
 
-    if (args.player_id === myId && args.pending_tiles && args.pending_tiles.length > 0) {
-      this.placeTile.showBonusButtons(args.pending_tiles);
-    } else if (args.player_id === myId) {
-      this.placeTile.clearPendingTiles();
-      this.bga.statusBar.removeActionButtons();
-    }
+    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
   }
 
   async notif_bonusTilePlaced(args: NotifTilePlacedArgs) {
@@ -238,12 +268,11 @@ export class Game {
       gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
     }
 
-    if (args.player_id === myId && args.pending_tiles && args.pending_tiles.length > 0) {
-      this.placeTile.showBonusButtons(args.pending_tiles);
-    } else if (args.player_id === myId) {
-      this.placeTile.clearPendingTiles();
-      this.bga.statusBar.removeActionButtons();
-    }
+    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
+  }
+
+  async notif_streetArtChosen(args: NotifStreetArtChosenArgs) {
+    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
   }
 
   async notif_turnFinalized(args: NotifTurnFinalizedArgs) {

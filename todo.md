@@ -69,16 +69,6 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 
 ---
 
-## Later — placement UX
-
-- [ ] Valid-placement hint: highlight where a tile may legally touch (S-Bahn on first turn; last tile + S-Bahn later)
-- [ ] SVG preview overlay (replace or layer on CSS cells)
-- [ ] SVG scribbled circles on tracks
-- [ ] ring controls on board (Ark Nova style)
-- [ ] Soundeffects
-
----
-
 ## Later — game logic
 
 - [x] Collection balls: end-of-turn scoring, circles, live score updates
@@ -92,6 +82,16 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [ ] Score for all 4 scoring tracks
 - [ ] implement 'undo'
 - [ ] More maps / content
+
+## Later — placement UX
+
+- [ ] Valid-placement hint: highlight where a tile may legally touch (S-Bahn on first turn; last tile + S-Bahn later)
+- [ ] SVG preview overlay (replace or layer on CSS cells)
+- [ ] SVG scribbled circles on tracks
+- [ ] ring controls on board (Ark Nova style)
+- [ ] Soundeffects
+
+---
 
 ---
 

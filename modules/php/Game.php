@@ -214,6 +214,7 @@ class Game extends \Bga\GameFramework\Table {
         }, $cells);
 
         $this->checkBonusTilesFromCells($playerId, $cellKeys);
+        $this->checkStreetArt($playerId, $cellKeys);
     }
 
     public function placeBonusTile(int $playerId, string $tileType, int $x, int $y, int $rotation, bool $mirror): void {
@@ -260,6 +261,108 @@ class Game extends \Bga\GameFramework\Table {
         $this->removePendingBonusTile($playerId, $tileType);
 
         $this->checkBonusTilesFromCells($playerId, $cellKeys);
+        $this->checkStreetArt($playerId, $cellKeys);
+    }
+
+    // ===== STREETART =====
+
+    public function isLegalStreetArtCell(int $playerId, int $x, int $y): bool {
+        if ($x < 0 || $x > 3 || $y < 0 || $y > 4) {
+            return false;
+        }
+
+        if (BERLIN_STREET_ART_MAP[$y][$x] === STREET_ART_START) {
+            return false;
+        }
+
+        $state = $this->getObjectFromDb("SELECT `street_art_completed` FROM `player_state` WHERE `player_id` = '$playerId'");
+        $completed = json_decode($state["street_art_completed"] ?? "[]", true) ?? [];
+
+        $completedKeys = [];
+        foreach ($completed as $key) {
+            $completedKeys[$key] = true;
+        }
+
+        if (isset($completedKeys[cellKey($x, $y)])) {
+            return false;
+        }
+
+        $references = $completedKeys;
+
+        foreach (BERLIN_STREET_ART_MAP as $sy => $row) {
+            foreach ($row as $sx => $type) {
+                if ($type === STREET_ART_START) {
+                    $references[cellKey((int) $sx, (int) $sy)] = true;
+                }
+            }
+        }
+
+        $neighbours = [[$x + 1, $y], [$x - 1, $y], [$x, $y + 1], [$x, $y - 1]];
+
+        foreach ($neighbours as [$nx, $ny]) {
+            if (isset($references[cellKey($nx, $ny)])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function chooseStreetArtCell(int $playerId, int $x, int $y) {
+        if (!$this->hasPendingStreetArt($playerId)) {
+            throw new UserException(clienttranslate("No street art mark available"));
+        }
+
+        if (!$this->isLegalStreetArtCell($playerId, $x, $y)) {
+            throw new UserException(clienttranslate("Illegal street art cell"));
+        }
+
+        $state = $this->getObjectFromDb(
+            "SELECT `street_art_completed`, `street_art_pending` FROM `player_state` WHERE `player_id` = '$playerId'"
+        );
+
+        $completed = json_decode($state["street_art_completed"] ?? "[]", true) ?? [];
+
+        $completed[] = cellKey($x, $y);
+
+        $newPending = (int) $state["street_art_pending"] - 1;
+
+        static::DBQuery(
+            "UPDATE            `player_state`
+            SET `street_art_completed` = '" .
+                json_encode($completed) .
+                "',
+            `street_art_pending` = $newPending
+             WHERE `player_id` = '$playerId' "
+        );
+
+        $type = BERLIN_STREET_ART_MAP[$y][$x];
+        $reward = STREET_ART_REWARDS[$type] ?? null;
+
+        if ($reward === null) {
+            return;
+        }
+
+        if (isset($reward["points"])) {
+            $points = (int) $reward["points"];
+
+            $scoreState = $this->getObjectFromDb("SELECT `street_art_score` FROM `player_state` WHERE `player_id` = '$playerId'");
+            $oldScore = (int) $scoreState["street_art_score"];
+            $newScore = $oldScore + $points;
+
+            static::DbQuery("UPDATE `player_state` SET `street_art_score` = $newScore WHERE `player_id` = '$playerId'");
+
+            $this->playerScore->inc($playerId, $points);
+        }
+
+        if (isset($reward["tile"])) {
+            $tiles = $this->getPendingBonusTiles($playerId);
+            $tiles[] = $reward["tile"];
+
+            static::DbQuery(
+                "UPDATE `player_state` SET `pending_bonus_tiles` = '" . json_encode($tiles) . "' WHERE `player_id` = '$playerId'"
+            );
+        }
     }
 
     // ===== BONUS TILE HELPERS =====
@@ -271,6 +374,14 @@ class Game extends \Bga\GameFramework\Table {
         );
         $tiles = json_decode($state["pending_bonus_tiles"], true);
         return count($tiles) > 0;
+    }
+
+    public function hasPendingStreetArt(int $playerId): bool {
+        $state = $this->getObjectFromDb(
+            "SELECT `street_art_pending` FROM `player_state`
+             WHERE `player_id` = '$playerId'"
+        );
+        return (int) $state["street_art_pending"] > 0;
     }
 
     public function getPendingBonusTiles(int $playerId): array {
@@ -301,6 +412,17 @@ class Game extends \Bga\GameFramework\Table {
                 "'
             WHERE `player_id` = '$playerId'"
         );
+    }
+
+    public function finishPlacementOrWait(int $playerId): bool {
+        // returns true if turn is fully done (caller should finalize + deactivate)
+        if ($this->hasPendingStreetArt($playerId)) {
+            return false;
+        }
+        if ($this->hasPendingBonusTiles($playerId)) {
+            return false;
+        }
+        return true;
     }
 
     // ===== CELLS THIS TURN =====
@@ -511,6 +633,34 @@ class Game extends \Bga\GameFramework\Table {
                 );
             }
         }
+    }
+
+    // ===== CHECK STREET ART =====
+
+    public function checkStreetArt(int $playerId, array $cellKeys): void {
+        $graffitiCount = 0;
+        foreach ($cellKeys as $cellKey) {
+            list($x, $y) = explode(",", $cellKey);
+            if (getCellType((int) $x, (int) $y) === CELL_GRAFFITI) {
+                $graffitiCount++;
+            }
+        }
+
+        if ($graffitiCount === 0) {
+            return;
+        }
+
+        $state = $this->getObjectFromDb(
+            "SELECT `street_art_pending` FROM `player_state`
+         WHERE `player_id` = '$playerId'"
+        );
+        $newPending = (int) $state["street_art_pending"] + $graffitiCount;
+
+        static::DbQuery(
+            "UPDATE `player_state`
+         SET `street_art_pending` = $newPending
+         WHERE `player_id` = '$playerId'"
+        );
     }
 
     // ===== CHECK UFOs =====

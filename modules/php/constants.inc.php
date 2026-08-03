@@ -21,6 +21,8 @@ const TILE_SZ4 = "SZ4"; // S/Z-shape 4-square
 const TILE_T5 = "T5"; // T-shape 5-square
 const TILE_I1 = "I1"; // 1-square tile
 const TILE_I2 = "I2"; // 2-square tile
+const TILE_L3 = "L3"; // L-shape 3-square
+const TILE_SQR6 = "SQR6"; // Square 6-square
 
 const ALWAYS_AVAILABLE_TILES = [TILE_I1, TILE_I2];
 
@@ -45,6 +47,8 @@ const TILE_SHAPES = [
     TILE_T5 => [[0, 0], [0, 1], [-1, 2], [0, 2], [1, 2]],
     TILE_I1 => [[0, 0]],
     TILE_I2 => [[0, 0], [1, 0]],
+    TILE_L3 => [[0, 0], [0, 1], [1, 1]],
+    TILE_SQR6 => [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]],
 ];
 
 // Berlin map — 18 columns x 13 rows, top-left = (0,0)
@@ -96,7 +100,37 @@ const BERLIN_COLLECTION_SCORES = [2, 2, 2, 2, 2, 2, 2, 2];
 // Collection ball scoring track — 2 points each, up to 8 balls
 const BERLIN_UFO_SCORES = [0, 20, 0, 40];
 
-// TODO: add the scoring for Street Art
+// Cell type constants Street Art
+const STREET_ART_START = 0;
+const STREET_ART_3_POINTS = 1;
+const STREET_ART_5_POINTS = 2;
+const STREET_ART_10_POINTS = 3;
+const STREET_ART_15_POINTS = 4;
+const STREET_ART_L3 = 5;
+const STREET_ART_L4 = 6;
+const STREET_ART_U5 = 7;
+const STREET_ART_SZ4 = 8;
+const STREET_ART_SQR6 = 9;
+const STREET_ART_T5 = 10;
+
+const STREET_ART_REWARDS = [
+    // Points rewards
+    STREET_ART_3_POINTS => ["points" => 3],
+    STREET_ART_5_POINTS => ["points" => 5],
+    STREET_ART_10_POINTS => ["points" => 10],
+    STREET_ART_15_POINTS => ["points" => 15],
+
+    // Tiles rewards
+    STREET_ART_L3 => ["tile" => TILE_L3],
+    STREET_ART_L4 => ["tile" => TILE_L4],
+    STREET_ART_U5 => ["tile" => TILE_U5],
+    STREET_ART_SZ4 => ["tile" => TILE_SZ4],
+    STREET_ART_SQR6 => ["tile" => TILE_SQR6],
+    STREET_ART_T5 => ["tile" => TILE_T5],
+];
+
+// Street Art map — 4 columns x 5 rows
+const BERLIN_STREET_ART_MAP = [[10, 3, 4, 4], [2, 2, 3, 9], [1, 8, 2, 3], [5, 1, 6, 2], [0, 1, 1, 7]];
 
 // S-Bahn start positions — players can start adjacent to any of these
 const BERLIN_SBAHN_POSITIONS = [[8, 0], [0, 5], [17, 5], [8, 12]];

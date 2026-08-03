@@ -21,12 +21,14 @@ interface GreetingsFromEarthGamedatas extends Gamedatas<GreetingsFromEarthPlayer
     monument_count: number;
     monument_score: number;
     monument_collection_score: number;
-    street_art_progress: number;
     pending_bonus_tiles: string;
     mustsee_completed: string;
     mustsee_score: number;
     monument_completed: string;
     cells_this_turn: string;
+    street_art_completed: string;
+    street_art_score: number;
+    street_art_pending: number;
   };
 }
 
@@ -51,6 +53,7 @@ interface NotifTilePlacedArgs {
   rotation: number;
   mirror: boolean;
   pending_tiles?: string[];
+  street_art_pending?: number;
 }
 
 interface NotifNewRoundArgs {
@@ -69,4 +72,18 @@ interface NotifTurnFinalizedArgs {
   monument_completed: string[];
   monument_score: number;
   monument_collection_score: number;
+  pending_tiles?: string[];
+  street_art_completed?: string[];
+  street_art_pending?: number;
+}
+
+interface NotifStreetArtChosenArgs {
+  player_id: number;
+  player_name: string;
+  x: number;
+  y: number;
+  street_art_pending: number;
+  street_art_completed: string[];
+  street_art_score: number;
+  pending_tiles: string[];
 }

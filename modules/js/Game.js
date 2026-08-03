@@ -40,14 +40,62 @@ function getSbahnCellSet() {
 // Tile shapes — array of [dx, dy] offsets from anchor cell
 // All tiles can be rotated and mirrored by the player
 const TILE_SHAPES = {
-    I4: [[0, 0], [1, 0], [2, 0], [3, 0]],
-    U5: [[0, 0], [1, 0], [2, 0], [0, 1], [2, 1]],
-    L4: [[0, 0], [0, 1], [0, 2], [1, 2]],
-    T4: [[0, 0], [1, 0], [2, 0], [1, 1]],
-    SZ4: [[0, 0], [1, 0], [1, 1], [2, 1]],
-    T5: [[0, 0], [0, 1], [-1, 2], [0, 2], [1, 2]],
+    I4: [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+        [3, 0]
+    ],
+    U5: [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+        [0, 1],
+        [2, 1]
+    ],
+    L4: [
+        [0, 0],
+        [0, 1],
+        [0, 2],
+        [1, 2]
+    ],
+    T4: [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+        [1, 1]
+    ],
+    SZ4: [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [2, 1]
+    ],
+    T5: [
+        [0, 0],
+        [0, 1],
+        [-1, 2],
+        [0, 2],
+        [1, 2]
+    ],
     I1: [[0, 0]],
-    I2: [[0, 0], [1, 0]],
+    I2: [
+        [0, 0],
+        [1, 0]
+    ],
+    L3: [
+        [0, 0],
+        [0, 1],
+        [1, 1]
+    ],
+    SQR6: [
+        [0, 0],
+        [0, 1],
+        [0, 2],
+        [1, 0],
+        [1, 1],
+        [1, 2]
+    ]
 };
 // Order: rotate, then mirror — must match PHP
 function getShapeCells(tileType, anchorX, anchorY, rotation = 0, mirror = false) {
@@ -280,6 +328,12 @@ class PlaceTile {
     }
     clearPendingTiles() {
         this.pendingTiles = [];
+    }
+    showStreetArtChoose() {
+        this.clearPendingTiles();
+        this.resetPlacementState();
+        this.bga.statusBar.setTitle(_("${you} must mark a street art bonus"));
+        this.bga.statusBar.removeActionButtons();
     }
     constructor(game, bga) {
         this.game = game;
@@ -580,8 +634,12 @@ class Game {
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
                         <div id="gfe-monument-collection-track-${playerId}" class="gfe-monument-collection-track"></div>
                         <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
+                        
+                        <div id="gfe-street-art-choose-${playerId}" class="gfe-street-art-choose"></div>
                     </div>
+                    
                 </div>
+
             `);
             // Set up player's play grid
             const playGridEl = document.getElementById(`gfe-play-grid-${playerId}`);
@@ -593,6 +651,17 @@ class Game {
                     }
                 }
                 playGridEl.innerHTML = cellsHTML;
+            }
+            // Set up street art grid
+            const streetArtGridEl = document.getElementById(`gfe-street-art-choose-${playerId}`);
+            if (streetArtGridEl) {
+                let cellsHTML = "";
+                for (let y = 0; y < 5; y++) {
+                    for (let x = 0; x < 4; x++) {
+                        cellsHTML += `<div class="gfe-street-art-choose-cell" data-x="${x}" data-y="${y}"></div>`;
+                    }
+                }
+                streetArtGridEl.innerHTML = cellsHTML;
             }
         });
         // Set up tracks and covered cells
@@ -615,6 +684,23 @@ class Game {
         if (roundEl)
             roundEl.textContent = String(args.round);
     }
+    // ===== Helper functions =====
+    continueAfterPlacement(playerId, streetArtPending, pendingTiles) {
+        const myId = this.bga.players.getCurrentPlayerId();
+        if (playerId !== myId)
+            return;
+        if (streetArtPending > 0) {
+            this.placeTile.showStreetArtChoose();
+            return;
+        }
+        if (pendingTiles.length > 0) {
+            this.placeTile.showBonusButtons(pendingTiles);
+            return;
+        }
+        this.placeTile.clearPendingTiles();
+        this.bga.statusBar.removeActionButtons();
+    }
+    // ===== NOTIFICATIONS =====
     async notif_tilePlaced(args) {
         const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
         this.renderCoveredCells(args.player_id, cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type })));
@@ -631,13 +717,7 @@ class Game {
             gamedatas.playerState.last_rotation = args.rotation;
             gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
         }
-        if (args.player_id === myId && args.pending_tiles && args.pending_tiles.length > 0) {
-            this.placeTile.showBonusButtons(args.pending_tiles);
-        }
-        else if (args.player_id === myId) {
-            this.placeTile.clearPendingTiles();
-            this.bga.statusBar.removeActionButtons();
-        }
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
     }
     async notif_bonusTilePlaced(args) {
         const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
@@ -655,13 +735,10 @@ class Game {
             gamedatas.playerState.last_rotation = args.rotation;
             gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
         }
-        if (args.player_id === myId && args.pending_tiles && args.pending_tiles.length > 0) {
-            this.placeTile.showBonusButtons(args.pending_tiles);
-        }
-        else if (args.player_id === myId) {
-            this.placeTile.clearPendingTiles();
-            this.bga.statusBar.removeActionButtons();
-        }
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
+    }
+    async notif_streetArtChosen(args) {
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
     }
     async notif_turnFinalized(args) {
         const monument = Array.isArray(args.monument_completed)
