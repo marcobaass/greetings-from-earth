@@ -78,14 +78,22 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] Monument surround scoring
 - [x] calculation of monument/collection score -> total score added to player score is monument score \* collection score
 - [x] UI show monument/collection score and total score on sheet
-- [ ] Street art / graffiti scoring
-- [ ] Score for all 4 scoring tracks
+- [x] Street art / graffiti scoring
+- [x] Street art score on sheet
+- [x] Circles on street art track
+- [ ] I1/I2 when a street-art tile can’t be placed
+- [ ] Roundtracker top of sheet
+- [ ] Live score update on sheet
+- [ ] Indicator for square on tiles where to place
+- [ ] Last tile placed differently colored
+- [ ] Better visible where to place and where forbidden
 - [ ] implement 'undo'
 - [ ] More maps / content
 
 ## Later — placement UX
 
 - [ ] Valid-placement hint: highlight where a tile may legally touch (S-Bahn on first turn; last tile + S-Bahn later)
+- [ ] tile on mouse first?
 - [ ] SVG preview overlay (replace or layer on CSS cells)
 - [ ] SVG scribbled circles on tracks
 - [ ] ring controls on board (Ark Nova style)

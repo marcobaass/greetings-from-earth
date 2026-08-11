@@ -225,12 +225,16 @@ class PlaceTile {
     cleanupActivePlayer() {
         const playerId = this.bga.players.getCurrentPlayerId();
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-        if (!grid)
-            return;
-        // remove valid/invalid indicators
-        this.cleanUpPreview(grid);
-        grid.classList.remove("gfe-play-grid-interactive");
-        grid.removeEventListener("click", this.onGridClick);
+        const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
+        if (grid) {
+            this.cleanUpPreview(grid);
+            grid.classList.remove("gfe-play-grid-interactive");
+            grid.removeEventListener("click", this.onGridClick);
+        }
+        if (streetArtGrid) {
+            streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
+            streetArtGrid.removeEventListener("click", this.onStreetArtClick);
+        }
         // forgets which tile player picked up and where
         this.resetPlacementState();
     }
@@ -332,8 +336,15 @@ class PlaceTile {
     showStreetArtChoose() {
         this.clearPendingTiles();
         this.resetPlacementState();
+        const playerId = this.bga.players.getCurrentPlayerId();
+        const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
+        if (!streetArtGrid)
+            return;
         this.bga.statusBar.setTitle(_("${you} must mark a street art bonus"));
         this.bga.statusBar.removeActionButtons();
+        streetArtGrid.removeEventListener("click", this.onStreetArtClick);
+        streetArtGrid.classList.add("gfe-street-art-choose-interactive");
+        streetArtGrid.addEventListener("click", this.onStreetArtClick);
     }
     constructor(game, bga) {
         this.game = game;
@@ -358,6 +369,19 @@ class PlaceTile {
             if (isNaN(this.anchorX) || isNaN(this.anchorY))
                 return;
             this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        };
+        this.onStreetArtClick = (event) => {
+            const cell = event.target;
+            if (!(cell instanceof HTMLElement) || !cell.classList.contains("gfe-street-art-choose-cell"))
+                return;
+            const x = Number(cell.dataset.x);
+            const y = Number(cell.dataset.y);
+            if (isNaN(x) || isNaN(y))
+                return;
+            this.bga.actions.performAction("actChooseStreetArt", {
+                x: x,
+                y: y
+            });
         };
         this.rotation = 0;
         this.mirror = false;
@@ -609,6 +633,25 @@ class Game {
         }
         track.innerHTML += `<div class="gfe-ufo-score"><p class="gfe-track-score-orange">${ufoScoreString}</p></div>`;
     }
+    renderStreetArtTrack(playerId, completedKeys, streetArtScore) {
+        const streetArtGridEl = document.getElementById(`gfe-street-art-choose-${playerId}`);
+        const streetArtScoreEl = document.getElementById(`gfe-street-art-score-${playerId}`);
+        if (!streetArtGridEl)
+            return;
+        const streetArtScoreString = streetArtScore.toString();
+        for (const cell of completedKeys) {
+            const [x, y] = cell.split(",");
+            if (isNaN(Number(x)) || isNaN(Number(y)))
+                continue;
+            const cellEl = streetArtGridEl.querySelector(`.gfe-street-art-choose-cell[data-x="${Number(x)}"][data-y="${Number(y)}"]`);
+            if (cellEl) {
+                cellEl.classList.add("gfe-street-art-marked");
+            }
+        }
+        if (streetArtScoreEl) {
+            streetArtScoreEl.innerHTML = `<p class="gfe-track-score-blue">${streetArtScoreString}</p>`;
+        }
+    }
     // ===== GAME SETUP =====
     // This is called when the game is setup
     setup(gamedatas) {
@@ -634,7 +677,7 @@ class Game {
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
                         <div id="gfe-monument-collection-track-${playerId}" class="gfe-monument-collection-track"></div>
                         <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
-                        
+                        <div id="gfe-street-art-score-${playerId}" class="gfe-street-art-score"></div>
                         <div id="gfe-street-art-choose-${playerId}" class="gfe-street-art-choose"></div>
                     </div>
                     
@@ -668,6 +711,8 @@ class Game {
         const myId = this.bga.players.getCurrentPlayerId();
         this.renderCoveredCells(myId, gamedatas.coveredCells);
         const monument = JSON.parse(String(gamedatas.playerState.monument_completed || "[]"));
+        const streetArt = JSON.parse(String(gamedatas.playerState.street_art_completed || "[]"));
+        this.renderStreetArtTrack(myId, streetArt, Number(gamedatas.playerState.street_art_score));
         this.renderMonumentCollectionTrack(myId, monument.length, Number(gamedatas.playerState.collection_count), Number(gamedatas.playerState.monument_score), Number(gamedatas.playerState.collection_score), Number(gamedatas.playerState.monument_collection_score));
         const mustsee = JSON.parse(String(gamedatas.playerState.mustsee_completed || "[]"));
         this.renderMustSeeUfoTrack(myId, Number(gamedatas.playerState.ufo_count), mustsee.length, Number(gamedatas.playerState.mustsee_score), Number(gamedatas.playerState.ufo_score));
@@ -738,6 +783,7 @@ class Game {
         this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
     }
     async notif_streetArtChosen(args) {
+        this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
         this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
     }
     async notif_turnFinalized(args) {

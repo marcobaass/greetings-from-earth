@@ -24,6 +24,22 @@ export class PlaceTile {
     this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
   };
 
+  private onStreetArtClick = (event: MouseEvent) => {
+    const cell = event.target as HTMLElement;
+
+    if (!(cell instanceof HTMLElement) || !cell.classList.contains("gfe-street-art-choose-cell")) return;
+
+    const x = Number(cell.dataset.x);
+    const y = Number(cell.dataset.y);
+
+    if (isNaN(x) || isNaN(y)) return;
+
+    this.bga.actions.performAction("actChooseStreetArt", {
+      x: x,
+      y: y
+    });
+  };
+
   private cleanUpPreview(grid: HTMLElement) {
     grid.querySelectorAll(".gfe-cell-preview").forEach((el) => {
       el.classList.remove("gfe-cell-preview");
@@ -43,13 +59,18 @@ export class PlaceTile {
   private cleanupActivePlayer() {
     const playerId = this.bga.players.getCurrentPlayerId();
     const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-    if (!grid) return;
+    const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
 
-    // remove valid/invalid indicators
-    this.cleanUpPreview(grid);
+    if (grid) {
+      this.cleanUpPreview(grid);
+      grid.classList.remove("gfe-play-grid-interactive");
+      grid.removeEventListener("click", this.onGridClick);
+    }
 
-    grid.classList.remove("gfe-play-grid-interactive");
-    grid.removeEventListener("click", this.onGridClick);
+    if (streetArtGrid) {
+      streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
+      streetArtGrid.removeEventListener("click", this.onStreetArtClick);
+    }
 
     // forgets which tile player picked up and where
     this.resetPlacementState();
@@ -175,8 +196,17 @@ export class PlaceTile {
     this.clearPendingTiles();
     this.resetPlacementState();
 
+    const playerId = this.bga.players.getCurrentPlayerId();
+    const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
+
+    if (!streetArtGrid) return;
+
     this.bga.statusBar.setTitle(_("${you} must mark a street art bonus"));
     this.bga.statusBar.removeActionButtons();
+
+    streetArtGrid.removeEventListener("click", this.onStreetArtClick);
+    streetArtGrid.classList.add("gfe-street-art-choose-interactive");
+    streetArtGrid.addEventListener("click", this.onStreetArtClick);
   }
 
   constructor(

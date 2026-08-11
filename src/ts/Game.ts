@@ -91,6 +91,28 @@ export class Game {
     track.innerHTML += `<div class="gfe-ufo-score"><p class="gfe-track-score-orange">${ufoScoreString}</p></div>`;
   }
 
+  private renderStreetArtTrack(playerId: number, completedKeys: string[], streetArtScore: number) {
+    const streetArtGridEl = document.getElementById(`gfe-street-art-choose-${playerId}`);
+    const streetArtScoreEl = document.getElementById(`gfe-street-art-score-${playerId}`);
+    if (!streetArtGridEl) return;
+
+    const streetArtScoreString = streetArtScore.toString();
+
+    for (const cell of completedKeys) {
+      const [x, y] = cell.split(",");
+      if (isNaN(Number(x)) || isNaN(Number(y))) continue;
+
+      const cellEl = streetArtGridEl.querySelector(`.gfe-street-art-choose-cell[data-x="${Number(x)}"][data-y="${Number(y)}"]`);
+      if (cellEl) {
+        cellEl.classList.add("gfe-street-art-marked");
+      }
+    }
+
+    if (streetArtScoreEl) {
+      streetArtScoreEl.innerHTML = `<p class="gfe-track-score-blue">${streetArtScoreString}</p>`;
+    }
+  }
+
   // ===== GAME SETUP =====
 
   // This is called when the game is setup
@@ -124,7 +146,7 @@ export class Game {
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
                         <div id="gfe-monument-collection-track-${playerId}" class="gfe-monument-collection-track"></div>
                         <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
-                        
+                        <div id="gfe-street-art-score-${playerId}" class="gfe-street-art-score"></div>
                         <div id="gfe-street-art-choose-${playerId}" class="gfe-street-art-choose"></div>
                     </div>
                     
@@ -164,6 +186,10 @@ export class Game {
 
     this.renderCoveredCells(myId, gamedatas.coveredCells);
     const monument = JSON.parse(String(gamedatas.playerState.monument_completed || "[]")) as string[];
+    const streetArt = JSON.parse(String(gamedatas.playerState.street_art_completed || "[]")) as string[];
+
+    this.renderStreetArtTrack(myId, streetArt, Number(gamedatas.playerState.street_art_score));
+
     this.renderMonumentCollectionTrack(
       myId,
       monument.length,
@@ -272,6 +298,8 @@ export class Game {
   }
 
   async notif_streetArtChosen(args: NotifStreetArtChosenArgs) {
+    this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
+
     this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
   }
 
