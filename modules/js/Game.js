@@ -587,6 +587,30 @@ class Game {
         this.bga.states.register("PlaceBonus", this.placeBonus);
     }
     // ===== RENDERING =====
+    renderRoundTracker(playerId, round) {
+        const roundTracker = document.getElementById(`gfe-round-tracker-${playerId}`);
+        if (!roundTracker || round === 0)
+            return;
+        const ROUNDS_POSITIONS = [
+            { top: 55.2, left: 1.2 },
+            { top: 45.2, left: 8.1 },
+            { top: 37.2, left: 15.2 },
+            { top: 45.2, left: 24 },
+            { top: 48, left: 30.6 },
+            { top: 50, left: 37 },
+            { top: 51.8, left: 43 },
+            { top: 25.3, left: 52.2 },
+            { top: 17, left: 58.6 },
+            { top: 8.7, left: 65.3 },
+            { top: 2.7, left: 71.3 },
+            { top: 3.7, left: 79.3 },
+            { top: 14.5, left: 85.6 },
+            { top: 26.9, left: 91.9 }
+        ];
+        for (let i = 0; i < round; i++) {
+            roundTracker.innerHTML += `<div class="gfe-round-tracker-circle" style="top: ${ROUNDS_POSITIONS[i].top}%; left: ${ROUNDS_POSITIONS[i].left}%"></div>`;
+        }
+    }
     renderCoveredCells(playerId, coveredCells) {
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
         if (!grid)
@@ -679,6 +703,7 @@ class Game {
                         <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
                         <div id="gfe-street-art-score-${playerId}" class="gfe-street-art-score"></div>
                         <div id="gfe-street-art-choose-${playerId}" class="gfe-street-art-choose"></div>
+                        <div id="gfe-round-tracker-${playerId}" class="gfe-round-tracker"></div>
                     </div>
                     
                 </div>
@@ -709,6 +734,7 @@ class Game {
         });
         // Set up tracks and covered cells
         const myId = this.bga.players.getCurrentPlayerId();
+        this.renderRoundTracker(myId, gamedatas.currentRound);
         this.renderCoveredCells(myId, gamedatas.coveredCells);
         const monument = JSON.parse(String(gamedatas.playerState.monument_completed || "[]"));
         const streetArt = JSON.parse(String(gamedatas.playerState.street_art_completed || "[]"));
@@ -725,6 +751,7 @@ class Game {
     }
     async notif_newRound(args) {
         console.log("New round:", args.round, "Dice roll:", args.dice_roll);
+        this.renderRoundTracker(this.bga.players.getCurrentPlayerId(), args.round);
         const roundEl = document.getElementById("gfe-round");
         if (roundEl)
             roundEl.textContent = String(args.round);
@@ -787,6 +814,7 @@ class Game {
         this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
     }
     async notif_turnFinalized(args) {
+        this.renderRoundTracker(args.player_id, this.bga.gameui.gamedatas.currentRound);
         const monument = Array.isArray(args.monument_completed)
             ? args.monument_completed
             : JSON.parse(String(args.monument_completed || "[]"));

@@ -314,3 +314,22 @@
 .gfe-track-score-blue {
   color: #4971e4;
 }
+
+/* Round tracker */
+
+.gfe-round-tracker {
+  position: absolute;
+  top: 14%;
+  left: 44%;
+  width: 33%;
+  height: 7%;
+  border: solid 2px yellow;
+}
+
+.gfe-round-tracker-circle {
+  position: absolute;
+  width: 3.8%;
+  height: 25%;
+  border-radius: 50%;
+  border: 4px solid black;
+}
