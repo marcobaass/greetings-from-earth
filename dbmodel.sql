@@ -42,6 +42,17 @@ CREATE TABLE IF NOT EXISTS `player_cells` (
     PRIMARY KEY (`player_id`, `x`, `y`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+CREATE TABLE IF NOT EXISTS `player_placements` (
+    `placement_id`  INT(10)         NOT NULL AUTO_INCREMENT,
+    `player_id`     INT(10)         NOT NULL,
+    `tile_type`     VARCHAR(4)      NOT NULL,
+    `x`             TINYINT(2)      NOT NULL,
+    `y`             TINYINT(2)      NOT NULL,
+    `rotation`      SMALLINT(2)     NOT NULL,
+    `mirror`        TINYINT(1)      NOT NULL,
+    PRIMARY KEY (`placement_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 -- Player state — one row per player, tracks progress and collected items
 CREATE TABLE IF NOT EXISTS `player_state` (
     `player_id`             INT(10)         NOT NULL,
@@ -66,7 +77,7 @@ CREATE TABLE IF NOT EXISTS `player_state` (
     `monument_completed`    VARCHAR(64)     NOT NULL DEFAULT '[]',
     `monument_score`        TINYINT(2)      NOT NULL DEFAULT 0,
     `monument_collection_score` SMALLINT(2)      NOT NULL DEFAULT 0,
-    `cells_this_turn`        VARCHAR(128)    NOT NULL DEFAULT '[]',
+    `cells_this_turn`        VARCHAR(512)    NOT NULL DEFAULT '[]',
     PRIMARY KEY (`player_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

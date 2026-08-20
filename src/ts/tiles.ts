@@ -130,3 +130,40 @@ export function computeTileShift(cells: [number, number][]): [number, number] {
 
   return [shiftX, shiftY];
 }
+
+export function cellsToOutlinePath(cells: [number, number][]): string {
+  const set = new Set(cells.map(([x, y]) => `${x},${y}`));
+  let d = "";
+
+  for (const [x, y] of cells) {
+    if (!set.has(`${x},${y - 1}`)) {
+      d += squiggleEdge(x, y, x + 1, y);
+    }
+    if (!set.has(`${x + 1},${y}`)) {
+      d += squiggleEdge(x + 1, y, x + 1, y + 1);
+    }
+    if (!set.has(`${x},${y + 1}`)) {
+      d += squiggleEdge(x + 1, y + 1, x, y + 1);
+    }
+    if (!set.has(`${x - 1},${y}`)) {
+      d += squiggleEdge(x, y + 1, x, y);
+    }
+  }
+  return d.trim();
+}
+
+/** Deterministic offset ~[-amp, amp] for an edge */
+function edgeNudge(ax: number, ay: number, bx: number, by: number, amp = 0.04): number {
+  const n = Math.sin(ax * 12.9898 + ay * 78.233 + bx * 37.719 + by * 9.123) * 43758.5453;
+  const r = n - Math.floor(n); // 0..1
+  return (r - 0.5) * 2 * amp;
+}
+function squiggleEdge(ax: number, ay: number, bx: number, by: number): string {
+  const mx = (ax + bx) / 2;
+  const my = (ay + by) / 2;
+  // perpendicular to (bx-ax, by-ay); for unit axis edges this has length 1
+  const px = -(by - ay);
+  const py = bx - ax;
+  const t = edgeNudge(ax, ay, bx, by);
+  return `M ${ax} ${ay} L ${mx + px * t} ${my + py * t} L ${bx} ${by} `;
+}

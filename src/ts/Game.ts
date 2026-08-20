@@ -1,6 +1,6 @@
 import { PlaceTile } from "./States/PlaceTile";
 import { PlaceBonus } from "./States/PlaceBonus";
-import { getShapeCells } from "./tiles";
+import { getShapeCells, cellsToOutlinePath } from "./tiles";
 
 export class Game {
   public bga: Bga<GreetingsFromEarthPlayer, GreetingsFromEarthGamedatas>;
@@ -151,6 +151,37 @@ export class Game {
     }
   }
 
+  private drawTileOnSVG(playerId: number, tileType: string, anchorX: number, anchorY: number, rotation: number, mirror: boolean) {
+    const tilesLayerEl = document.getElementById(`gfe-tiles-layer-${playerId}`);
+    if (!tilesLayerEl) return;
+
+    const cells = getShapeCells(tileType, anchorX, anchorY, rotation, mirror);
+
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    group.classList.add("gfe-tile");
+    // optional: data-tile-type, etc.
+
+    cells.forEach(([x, y]) => {
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", String(x));
+      rect.setAttribute("y", String(y));
+      rect.setAttribute("width", "1");
+      rect.setAttribute("height", "1");
+      rect.classList.add("gfe-tile-cell");
+      group.appendChild(rect);
+    });
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", cellsToOutlinePath(cells));
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "#1a1a1a");
+    path.setAttribute("stroke-width", "0.08");
+    path.classList.add("gfe-tile-outline");
+    group.appendChild(path);
+
+    tilesLayerEl.appendChild(group);
+  }
+
   // ===== GAME SETUP =====
 
   // This is called when the game is setup
@@ -181,6 +212,12 @@ export class Game {
                     <strong>${player.name}</strong>
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
+
+                        <!-- SVG layer for tiles -->
+                        <svg id="gfe-tiles-layer-${playerId}" class="gfe-tiles-layer" viewBox="0 0 18 13" preserveAspectRatio="none">
+
+                        </svg>
+
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
                         <div id="gfe-monument-collection-track-${playerId}" class="gfe-monument-collection-track"></div>
                         <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
@@ -225,7 +262,12 @@ export class Game {
 
     this.renderRoundTracker(myId, gamedatas.currentRound);
 
-    this.renderCoveredCells(myId, gamedatas.coveredCells);
+    const placements = gamedatas.placements ?? [];
+
+    for (const p of placements) {
+      this.drawTileOnSVG(myId, p.tile_type, Number(p.x), Number(p.y), Number(p.rotation), Number(p.mirror) === 1);
+    }
+
     const monument = JSON.parse(String(gamedatas.playerState.monument_completed || "[]")) as string[];
     const streetArt = JSON.parse(String(gamedatas.playerState.street_art_completed || "[]")) as string[];
 
@@ -286,12 +328,13 @@ export class Game {
   // ===== NOTIFICATIONS =====
 
   async notif_tilePlaced(args: NotifTilePlacedArgs) {
+    this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror);
     const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
 
-    this.renderCoveredCells(
-      args.player_id,
-      cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type }))
-    );
+    // this.renderCoveredCells(
+    //   args.player_id,
+    //   cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type }))
+    // );
 
     const myId = this.bga.players.getCurrentPlayerId();
 
@@ -314,12 +357,13 @@ export class Game {
   }
 
   async notif_bonusTilePlaced(args: NotifTilePlacedArgs) {
+    this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror);
     const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
 
-    this.renderCoveredCells(
-      args.player_id,
-      cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type }))
-    );
+    // this.renderCoveredCells(
+    //   args.player_id,
+    //   cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type }))
+    // );
 
     const myId = this.bga.players.getCurrentPlayerId();
 

@@ -83,7 +83,15 @@ class Game extends \Bga\GameFramework\Table {
 
         $result["coveredCells"] = $this->getObjectListFromDB(
             "SELECT `x`, `y`, `tile_type` FROM `player_cells`
-             WHERE `player_id` = '$currentPlayerId'"
+            WHERE `player_id` = '$currentPlayerId'
+            ORDER BY `x`, `y`"
+        );
+
+        $result["placements"] = $this->getObjectListFromDB(
+            "SELECT `tile_type`, `x`, `y`, `rotation`, `mirror`
+            FROM `player_placements`
+            WHERE `player_id` = '$currentPlayerId'
+            ORDER BY `x`, `y`"
         );
 
         $result["playerState"] = $this->getObjectFromDb("SELECT * FROM `player_state` WHERE `player_id` = '$currentPlayerId'");
@@ -185,6 +193,11 @@ class Game extends \Bga\GameFramework\Table {
         }
 
         // insert into player_cells
+        $mirrorInt = $mirror ? 1 : 0;
+        static::DbQuery("
+            INSERT INTO `player_placements` (`player_id`, `x`, `y`, `tile_type`, `rotation`, `mirror`)
+            VALUES ($playerId, $x, $y, '$tileType', $rotation, $mirrorInt)
+        ");
         foreach ($cells as $cell) {
             $cx = (int) $cell[0];
             $cy = (int) $cell[1];
@@ -193,8 +206,6 @@ class Game extends \Bga\GameFramework\Table {
                 VALUES ($playerId, $cx, $cy, '$tileType')
             ");
         }
-
-        $mirrorInt = $mirror ? 1 : 0;
 
         static::DbQuery("
             UPDATE `player_state` SET
@@ -230,6 +241,11 @@ class Game extends \Bga\GameFramework\Table {
         }
 
         // insert into player_cells
+        $mirrorInt = $mirror ? 1 : 0;
+        static::DbQuery("
+            INSERT INTO `player_placements` (`player_id`, `x`, `y`, `tile_type`, `rotation`, `mirror`)
+            VALUES ($playerId, $x, $y, '$tileType', $rotation, $mirrorInt)
+        ");
         foreach ($cells as $cell) {
             $cx = (int) $cell[0];
             $cy = (int) $cell[1];
@@ -238,8 +254,6 @@ class Game extends \Bga\GameFramework\Table {
                 VALUES ($playerId, $cx, $cy, '$tileType')
             ");
         }
-
-        $mirrorInt = $mirror ? 1 : 0;
 
         static::DbQuery("
             UPDATE `player_state` SET

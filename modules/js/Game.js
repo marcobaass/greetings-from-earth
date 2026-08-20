@@ -155,6 +155,40 @@ function computeTileShift(cells) {
         shiftY = 12 - maxY;
     return [shiftX, shiftY];
 }
+function cellsToOutlinePath(cells) {
+    const set = new Set(cells.map(([x, y]) => `${x},${y}`));
+    let d = "";
+    for (const [x, y] of cells) {
+        if (!set.has(`${x},${y - 1}`)) {
+            d += squiggleEdge(x, y, x + 1, y);
+        }
+        if (!set.has(`${x + 1},${y}`)) {
+            d += squiggleEdge(x + 1, y, x + 1, y + 1);
+        }
+        if (!set.has(`${x},${y + 1}`)) {
+            d += squiggleEdge(x + 1, y + 1, x, y + 1);
+        }
+        if (!set.has(`${x - 1},${y}`)) {
+            d += squiggleEdge(x, y + 1, x, y);
+        }
+    }
+    return d.trim();
+}
+/** Deterministic offset ~[-amp, amp] for an edge */
+function edgeNudge(ax, ay, bx, by, amp = 0.04) {
+    const n = Math.sin(ax * 12.9898 + ay * 78.233 + bx * 37.719 + by * 9.123) * 43758.5453;
+    const r = n - Math.floor(n); // 0..1
+    return (r - 0.5) * 2 * amp;
+}
+function squiggleEdge(ax, ay, bx, by) {
+    const mx = (ax + bx) / 2;
+    const my = (ay + by) / 2;
+    // perpendicular to (bx-ax, by-ay); for unit axis edges this has length 1
+    const px = -(by - ay);
+    const py = bx - ax;
+    const t = edgeNudge(ax, ay, bx, by);
+    return `M ${ax} ${ay} L ${mx + px * t} ${my + py * t} L ${bx} ${by} `;
+}
 
 /** Checks if the tile overlaps with the covered cells
  * @param tileCells - The cells of the tile to check for overlap
@@ -162,11 +196,16 @@ function computeTileShift(cells) {
  * @returns true if the tile overlaps with the covered cells, false otherwise
  */
 function overlapsCoveredCells(tileCells, coveredCells) {
-    const covered = new Set(coveredCells.map(cell => cellKey(cell.x, cell.y)));
-    return tileCells.some(([x, y]) => (covered.has(cellKey(x, y))));
+    const covered = new Set(coveredCells.map((cell) => cellKey(cell.x, cell.y)));
+    return tileCells.some(([x, y]) => covered.has(cellKey(x, y)));
 }
 function orthogonalNeighbors(x, y) {
-    return [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]];
+    return [
+        [x + 1, y],
+        [x - 1, y],
+        [x, y + 1],
+        [x, y - 1]
+    ];
 }
 function touchesAny(tileCells, referenceSet) {
     return tileCells.some(([x, y]) => orthogonalNeighbors(x, y).some(([nx, ny]) => referenceSet.has(cellKey(nx, ny))));
@@ -176,7 +215,7 @@ function getLastPlacedTileCells(playerState) {
         return [];
     if (playerState.last_x == null || playerState.last_y == null || playerState.last_tile_type == null)
         return [];
-    return getShapeCells(playerState.last_tile_type, playerState.last_x, playerState.last_y, playerState.last_rotation, playerState.last_mirror === 1);
+    return getShapeCells(playerState.last_tile_type, Number(playerState.last_x), Number(playerState.last_y), Number(playerState.last_rotation), Number(playerState.last_mirror) === 1);
 }
 //   if overlapsCoveredCells(tileCells, gamedatas.coveredCells): return false
 //   sbahnRefs = getSbahnCellSet()
@@ -191,7 +230,7 @@ function isPlacementLegal(tileCells, gamedatas) {
         return false;
     let referenceSet;
     //check for S-Bahn cells, monuments and rivers
-    if (tileCells.some(([x, y]) => (FORBIDDEN_CELL_TYPES.has(getCellType(x, y)))))
+    if (tileCells.some(([x, y]) => FORBIDDEN_CELL_TYPES.has(getCellType(x, y))))
         return false;
     //check for already covered cells
     if (overlapsCoveredCells(tileCells, gamedatas.coveredCells))
@@ -214,6 +253,10 @@ class PlaceTile {
             el.classList.remove("gfe-cell-preview-valid");
             el.classList.remove("gfe-cell-preview-illegal");
         });
+        grid.querySelectorAll(".gfe-cell-anchor").forEach((el) => {
+            el.classList.remove("gfe-cell-anchor");
+        });
+        document.getElementById(`gfe-tiles-layer-${this.bga.players.getCurrentPlayerId()}`)?.querySelector("#gfe-preview-crosshair")?.remove();
     }
     resetPlacementState() {
         this.tileSelected = null;
@@ -256,14 +299,65 @@ class PlaceTile {
         this.anchorX = anchorX;
         this.anchorY = anchorY;
         this.cleanUpPreview(grid);
+        const layer = document.getElementById(`gfe-tiles-layer-${this.bga.players.getCurrentPlayerId()}`);
         const legal = isPlacementLegal(cells, this.bga.gameui.gamedatas);
+        const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        group.setAttribute("id", "gfe-preview-crosshair");
+        const fill = legal ? "rgba(0, 128, 0, 0.35)" : "rgba(255, 0, 0, 0.35)";
         cells.forEach(([x, y]) => {
-            const cellElement = grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`);
-            if (cellElement) {
-                cellElement.classList.add("gfe-cell-preview");
-                cellElement.classList.add(legal ? "gfe-cell-preview-valid" : "gfe-cell-preview-illegal");
-            }
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("x", String(x));
+            rect.setAttribute("y", String(y));
+            rect.setAttribute("width", "1");
+            rect.setAttribute("height", "1");
+            rect.setAttribute("fill", fill);
+            rect.setAttribute("stroke", "none");
+            group.appendChild(rect);
         });
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", cellsToOutlinePath(cells));
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "#1a1a1a");
+        path.setAttribute("stroke-width", "0.08");
+        group.appendChild(path);
+        const cx = anchorX + 0.5;
+        const cy = anchorY + 0.5;
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", String(cx));
+        circle.setAttribute("cy", String(cy));
+        circle.setAttribute("r", "0.25");
+        circle.setAttribute("fill", "none");
+        circle.setAttribute("stroke", "#1a1a1a");
+        circle.setAttribute("stroke-width", "0.08");
+        group.appendChild(circle);
+        const h = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        h.setAttribute("x1", String(cx - 0.3));
+        h.setAttribute("y1", String(cy));
+        h.setAttribute("x2", String(cx + 0.3));
+        h.setAttribute("y2", String(cy));
+        h.setAttribute("stroke", "#1a1a1a");
+        h.setAttribute("stroke-width", "0.08");
+        group.appendChild(h);
+        const v = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        v.setAttribute("x1", String(cx));
+        v.setAttribute("y1", String(cy - 0.3));
+        v.setAttribute("x2", String(cx));
+        v.setAttribute("y2", String(cy + 0.3));
+        v.setAttribute("stroke", "#1a1a1a");
+        v.setAttribute("stroke-width", "0.08");
+        group.appendChild(v);
+        layer.appendChild(group);
+        // cells.forEach(([x, y]) => {
+        //   const cellElement = grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`);
+        //   if (cellElement) {
+        //     cellElement.classList.add("gfe-cell-preview");
+        //     cellElement.classList.add(legal ? "gfe-cell-preview-valid" : "gfe-cell-preview-illegal");
+        //   }
+        // });
+        const anchorEl = grid.querySelector(`.gfe-cell[data-x="${this.anchorX}"][data-y="${this.anchorY}"]`);
+        if (anchorEl) {
+            anchorEl.classList.add("gfe-cell-anchor");
+        }
         if (!this.placeTileArgs)
             return;
         this.updateActionButtons(legal, grid);
@@ -679,6 +773,32 @@ class Game {
             streetArtScoreEl.innerHTML = `<p class="gfe-track-score-blue">${streetArtScoreString}</p>`;
         }
     }
+    drawTileOnSVG(playerId, tileType, anchorX, anchorY, rotation, mirror) {
+        const tilesLayerEl = document.getElementById(`gfe-tiles-layer-${playerId}`);
+        if (!tilesLayerEl)
+            return;
+        const cells = getShapeCells(tileType, anchorX, anchorY, rotation, mirror);
+        const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        group.classList.add("gfe-tile");
+        // optional: data-tile-type, etc.
+        cells.forEach(([x, y]) => {
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("x", String(x));
+            rect.setAttribute("y", String(y));
+            rect.setAttribute("width", "1");
+            rect.setAttribute("height", "1");
+            rect.classList.add("gfe-tile-cell");
+            group.appendChild(rect);
+        });
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", cellsToOutlinePath(cells));
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "#1a1a1a");
+        path.setAttribute("stroke-width", "0.08");
+        path.classList.add("gfe-tile-outline");
+        group.appendChild(path);
+        tilesLayerEl.appendChild(group);
+    }
     // ===== GAME SETUP =====
     // This is called when the game is setup
     setup(gamedatas) {
@@ -701,6 +821,12 @@ class Game {
                     <strong>${player.name}</strong>
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
+
+                        <!-- SVG layer for tiles -->
+                        <svg id="gfe-tiles-layer-${playerId}" class="gfe-tiles-layer" viewBox="0 0 18 13" preserveAspectRatio="none">
+
+                        </svg>
+
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
                         <div id="gfe-monument-collection-track-${playerId}" class="gfe-monument-collection-track"></div>
                         <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
@@ -738,7 +864,10 @@ class Game {
         // Set up tracks and covered cells
         const myId = this.bga.players.getCurrentPlayerId();
         this.renderRoundTracker(myId, gamedatas.currentRound);
-        this.renderCoveredCells(myId, gamedatas.coveredCells);
+        const placements = gamedatas.placements ?? [];
+        for (const p of placements) {
+            this.drawTileOnSVG(myId, p.tile_type, Number(p.x), Number(p.y), Number(p.rotation), Number(p.mirror) === 1);
+        }
         const monument = JSON.parse(String(gamedatas.playerState.monument_completed || "[]"));
         const streetArt = JSON.parse(String(gamedatas.playerState.street_art_completed || "[]"));
         this.renderStreetArtTrack(myId, streetArt, Number(gamedatas.playerState.street_art_score));
@@ -777,8 +906,12 @@ class Game {
     }
     // ===== NOTIFICATIONS =====
     async notif_tilePlaced(args) {
+        this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror);
         const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
-        this.renderCoveredCells(args.player_id, cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type })));
+        // this.renderCoveredCells(
+        //   args.player_id,
+        //   cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type }))
+        // );
         const myId = this.bga.players.getCurrentPlayerId();
         if (args.player_id === myId) {
             const gamedatas = this.bga.gameui.gamedatas;
@@ -795,8 +928,12 @@ class Game {
         this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
     }
     async notif_bonusTilePlaced(args) {
+        this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror);
         const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
-        this.renderCoveredCells(args.player_id, cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type })));
+        // this.renderCoveredCells(
+        //   args.player_id,
+        //   cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type }))
+        // );
         const myId = this.bga.players.getCurrentPlayerId();
         if (args.player_id === myId) {
             const gamedatas = this.bga.gameui.gamedatas;

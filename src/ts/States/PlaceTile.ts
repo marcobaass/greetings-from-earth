@@ -1,6 +1,6 @@
 import { Game } from "../Game";
 import { isPlacementLegal } from "../placement";
-import { computeTileShift, getShapeCells, isInsideGrid } from "../tiles";
+import { computeTileShift, getShapeCells, isInsideGrid, cellsToOutlinePath } from "../tiles";
 
 export class PlaceTile {
   private tileSelected: string | null = null;
@@ -46,6 +46,10 @@ export class PlaceTile {
       el.classList.remove("gfe-cell-preview-valid");
       el.classList.remove("gfe-cell-preview-illegal");
     });
+    grid.querySelectorAll(".gfe-cell-anchor").forEach((el) => {
+      el.classList.remove("gfe-cell-anchor");
+    });
+    document.getElementById(`gfe-tiles-layer-${this.bga.players.getCurrentPlayerId()}`)?.querySelector("#gfe-preview-crosshair")?.remove();
   }
 
   private resetPlacementState() {
@@ -101,15 +105,76 @@ export class PlaceTile {
 
     this.cleanUpPreview(grid);
 
+    const layer = document.getElementById(`gfe-tiles-layer-${this.bga.players.getCurrentPlayerId()}`);
+
     const legal = isPlacementLegal(cells, this.bga.gameui.gamedatas);
 
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+    group.setAttribute("id", "gfe-preview-crosshair");
+
+    const fill = legal ? "rgba(0, 128, 0, 0.35)" : "rgba(255, 0, 0, 0.35)";
     cells.forEach(([x, y]) => {
-      const cellElement = grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`);
-      if (cellElement) {
-        cellElement.classList.add("gfe-cell-preview");
-        cellElement.classList.add(legal ? "gfe-cell-preview-valid" : "gfe-cell-preview-illegal");
-      }
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", String(x));
+      rect.setAttribute("y", String(y));
+      rect.setAttribute("width", "1");
+      rect.setAttribute("height", "1");
+      rect.setAttribute("fill", fill);
+      rect.setAttribute("stroke", "none");
+      group.appendChild(rect);
     });
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", cellsToOutlinePath(cells));
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "#1a1a1a");
+    path.setAttribute("stroke-width", "0.08");
+    group.appendChild(path);
+
+    const cx = anchorX + 0.5;
+    const cy = anchorY + 0.5;
+
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", String(cx));
+    circle.setAttribute("cy", String(cy));
+    circle.setAttribute("r", "0.25");
+    circle.setAttribute("fill", "none");
+    circle.setAttribute("stroke", "#1a1a1a");
+    circle.setAttribute("stroke-width", "0.08");
+    group.appendChild(circle);
+
+    const h = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    h.setAttribute("x1", String(cx - 0.3));
+    h.setAttribute("y1", String(cy));
+    h.setAttribute("x2", String(cx + 0.3));
+    h.setAttribute("y2", String(cy));
+    h.setAttribute("stroke", "#1a1a1a");
+    h.setAttribute("stroke-width", "0.08");
+    group.appendChild(h);
+    const v = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    v.setAttribute("x1", String(cx));
+    v.setAttribute("y1", String(cy - 0.3));
+    v.setAttribute("x2", String(cx));
+    v.setAttribute("y2", String(cy + 0.3));
+    v.setAttribute("stroke", "#1a1a1a");
+    v.setAttribute("stroke-width", "0.08");
+    group.appendChild(v);
+
+    layer.appendChild(group);
+
+    // cells.forEach(([x, y]) => {
+    //   const cellElement = grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`);
+    //   if (cellElement) {
+    //     cellElement.classList.add("gfe-cell-preview");
+    //     cellElement.classList.add(legal ? "gfe-cell-preview-valid" : "gfe-cell-preview-illegal");
+    //   }
+    // });
+
+    const anchorEl = grid.querySelector(`.gfe-cell[data-x="${this.anchorX}"][data-y="${this.anchorY}"]`);
+    if (anchorEl) {
+      anchorEl.classList.add("gfe-cell-anchor");
+    }
 
     if (!this.placeTileArgs) return;
 

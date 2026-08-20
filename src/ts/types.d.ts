@@ -4,6 +4,7 @@ interface GreetingsFromEarthGamedatas extends Gamedatas<GreetingsFromEarthPlayer
   currentRound: number;
   diceRoll: number;
   coveredCells: { x: number; y: number; tile_type: string }[];
+  placements: { tile_type: string; x: number; y: number; rotation: number; mirror: number }[];
   playerState: {
     player_id: number;
     last_x: number | null;
