@@ -75,6 +75,7 @@ interface NotifTurnFinalizedArgs {
   pending_tiles?: string[];
   street_art_completed?: string[];
   street_art_pending?: number;
+  street_art_score: number;
 }
 
 interface NotifStreetArtChosenArgs {

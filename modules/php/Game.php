@@ -468,7 +468,7 @@ class Game extends \Bga\GameFramework\Table {
 
         // get collection and UFO counts
         $state = $this->getObjectFromDb(
-            "SELECT collection_count, collection_score, ufo_count, ufo_score, mustsee_completed, mustsee_score, monument_completed, monument_score, monument_collection_score FROM player_state WHERE player_id = '$playerId'"
+            "SELECT collection_count, collection_score, ufo_count, ufo_score, mustsee_completed, mustsee_score, monument_completed, monument_score, monument_collection_score, street_art_score FROM player_state WHERE player_id = '$playerId'"
         );
         $collectionCount = (int) $state["collection_count"];
         $ufoCount = (int) $state["ufo_count"];
@@ -488,6 +488,7 @@ class Game extends \Bga\GameFramework\Table {
             "monument_completed" => json_decode($state["monument_completed"] ?? "[]", true),
             "monument_score" => (int) $state["monument_score"],
             "monument_collection_score" => (int) $state["monument_collection_score"],
+            "street_art_score" => (int) $state["street_art_score"],
         ]);
     }
 

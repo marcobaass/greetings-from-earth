@@ -81,14 +81,13 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] Street art / graffiti scoring
 - [x] Street art score on sheet
 - [x] Circles on street art track
-- [ ] Roundtracker top of sheet
+- [x] Roundtracker top of sheet
 - [ ] Live score update on sheet
 - [ ] Indicator for square on tiles where to place
 - [ ] Last tile placed differently colored
 - [ ] Better visible where to place and where forbidden
 - [ ] implement 'undo'
 - [ ] End Scoring
-- [ ] More maps / content
 
 ## Later — placement UX
 
