@@ -26,6 +26,9 @@ class NewRound extends \Bga\GameFramework\States\GameState {
         }
 
         $currentRound = (int) $this->game->getGameStateValue("current_round");
+        if ($currentRound >= TOTAL_ROUNDS) {
+            return EndScore::class;
+        }
         $currentRound++;
         $this->game->setGameStateValue("current_round", $currentRound);
 

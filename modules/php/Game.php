@@ -51,6 +51,11 @@ class Game extends \Bga\GameFramework\Table {
         $this->reattributeColorsBasedOnPreferences($players, $gameinfos["player_colors"]);
         $this->reloadPlayersBasicInfos();
 
+        $this->playerStats->init(
+            ["monument_score", "collection_score", "monument_collection_score", "mustsee_score", "ufo_score", "street_art_score"],
+            0
+        );
+
         // Init global state values
         $this->setGameStateInitialValue("current_round", 0);
         $this->setGameStateInitialValue("dice_roll", 0);
@@ -459,17 +464,13 @@ class Game extends \Bga\GameFramework\Table {
     }
 
     public function hasTurnEnded(int $playerId): bool {
-        $state = $this->getObjectFromDb(
-            "SELECT `turn_ended` FROM `player_state` WHERE `player_id` = '$playerId'"
-        );
+        $state = $this->getObjectFromDb("SELECT `turn_ended` FROM `player_state` WHERE `player_id` = '$playerId'");
         return (int) ($state["turn_ended"] ?? 0) === 1;
     }
 
     public function setTurnEnded(int $playerId, bool $ended): void {
         $value = $ended ? 1 : 0;
-        static::DbQuery(
-            "UPDATE `player_state` SET `turn_ended` = $value WHERE `player_id` = '$playerId'"
-        );
+        static::DbQuery("UPDATE `player_state` SET `turn_ended` = $value WHERE `player_id` = '$playerId'");
     }
 
     /**
@@ -532,9 +533,7 @@ class Game extends \Bga\GameFramework\Table {
             return false;
         }
 
-        $row = $this->getObjectFromDb(
-            "SELECT `turn_snapshot` FROM `player_state` WHERE `player_id` = '$playerId'"
-        );
+        $row = $this->getObjectFromDb("SELECT `turn_snapshot` FROM `player_state` WHERE `player_id` = '$playerId'");
         $snapshot = json_decode($row["turn_snapshot"] ?? "{}", true);
         if (!is_array($snapshot) || !isset($snapshot["max_placement_id"])) {
             return false;
@@ -653,9 +652,7 @@ class Game extends \Bga\GameFramework\Table {
         ];
 
         $json = static::escapeStringForDB(json_encode($snapshot));
-        static::DbQuery(
-            "UPDATE `player_state` SET `turn_snapshot` = '$json' WHERE `player_id` = '$playerId'"
-        );
+        static::DbQuery("UPDATE `player_state` SET `turn_snapshot` = '$json' WHERE `player_id` = '$playerId'");
     }
 
     public function restoreTurnSnapshot(int $playerId): void {

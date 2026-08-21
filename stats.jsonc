@@ -1,28 +1,38 @@
-{    
-    // Statistics for the table
-    "table": {},
-    
-    // Statistics for each player
-    "player": {
-      /* 
-      EXAMPLE:
+{
+  // Statistics for the table
+  "table": {},
 
-      "turns_number": {
-        "id": 10,
-        "name": "Number of turns",
-        "type": "int"
-      },
-      "player_teststat1": {
-        "id": 11,
-        "name": "player test stat 1",
-        "type": "int"
-      },
-      "player_teststat2": {
-        "id": 12,
-        "name": "player test stat 2",
-        "type": "float"
-      }
-      */
-
+  // Statistics for each player
+  "player": {
+    "monument_score": {
+      "id": 10,
+      "name": "Score of the Monuments",
+      "type": "int"
+    },
+    "collection_score": {
+      "id": 11,
+      "name": "Score of the Collection Balls",
+      "type": "int"
+    },
+    "monument_collection_score": {
+      "id": 12,
+      "name": "Score of the Monument Collection Balls",
+      "type": "int"
+    },
+    "mustsee_score": {
+      "id": 13,
+      "name": "Score of the Must Sees",
+      "type": "int"
+    },
+    "ufo_score": {
+      "id": 14,
+      "name": "Score of the UFOs",
+      "type": "int"
+    },
+    "street_art_score": {
+      "id": 15,
+      "name": "Score of the Street Art",
+      "type": "int"
     }
+  }
 }
