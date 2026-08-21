@@ -55,6 +55,7 @@ interface NotifTilePlacedArgs {
   mirror: boolean;
   pending_tiles?: string[];
   street_art_pending?: number;
+  awaiting_turn_confirm?: boolean;
 }
 
 interface NotifNewRoundArgs {
@@ -88,4 +89,13 @@ interface NotifStreetArtChosenArgs {
   street_art_completed: string[];
   street_art_score: number;
   pending_tiles: string[];
+  awaiting_turn_confirm?: boolean;
+}
+
+interface NotifTurnUndoneArgs {
+  player_id: number;
+  player_name: string;
+  coveredCells: GreetingsFromEarthGamedatas["coveredCells"];
+  placements: GreetingsFromEarthGamedatas["placements"];
+  playerState: GreetingsFromEarthGamedatas["playerState"];
 }

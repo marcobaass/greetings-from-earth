@@ -8,6 +8,10 @@ export class PlaceTile {
   private anchorX: number | null = null;
   private anchorY: number | null = null;
   private pendingTiles: string[] = [];
+  /** Client flag: placement done, waiting for End turn / Undo */
+  private awaitingEndTurn = false;
+  /** True only after a change this turn that can be reverted */
+  private canUndo = false;
 
   private onGridClick = (event: MouseEvent) => {
     const cell = event.target as HTMLElement;
@@ -221,7 +225,7 @@ export class PlaceTile {
     });
 
     if (legal && this.tileSelected) {
-      this.bga.statusBar.addActionButton("✔", () => {
+      this.bga.statusBar.addActionButton(_("Confirm placement"), () => {
         if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
         const cells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
         if (!isPlacementLegal(cells, this.bga.gameui.gamedatas)) return;
@@ -237,6 +241,19 @@ export class PlaceTile {
         });
       });
     }
+
+    this.addUndoButtonIfPossible();
+  }
+
+  public setCanUndo(value: boolean) {
+    this.canUndo = value;
+  }
+
+  private addUndoButtonIfPossible() {
+    if (!this.canUndo) return;
+    this.bga.statusBar.addActionButton(_("Undo"), () => {
+      this.bga.actions.performAction("actUndo", {});
+    });
   }
 
   public showBonusButtons(pendingTiles: string[]) {
@@ -245,9 +262,20 @@ export class PlaceTile {
 
     const playerId = this.bga.players.getCurrentPlayerId();
     const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+    const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
     if (!grid) return;
 
+    if (streetArtGrid) {
+      streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
+      streetArtGrid.removeEventListener("click", this.onStreetArtClick);
+    }
+
     this.cleanUpPreview(grid);
+
+    // street art step removes the grid handler — put it back so bonus tiles can be positioned
+    grid.removeEventListener("click", this.onGridClick);
+    grid.classList.add("gfe-play-grid-interactive");
+    grid.addEventListener("click", this.onGridClick);
 
     this.bga.statusBar.setTitle(_("${you} must place your bonus tile on the map"));
     this.updateActionButtons(false, grid);
@@ -255,6 +283,7 @@ export class PlaceTile {
 
   public clearPendingTiles() {
     this.pendingTiles = [];
+    this.awaitingEndTurn = false;
   }
 
   public showStreetArtChoose() {
@@ -263,15 +292,56 @@ export class PlaceTile {
 
     const playerId = this.bga.players.getCurrentPlayerId();
     const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
+    const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+
+    if (grid) {
+      this.cleanUpPreview(grid);
+      grid.classList.remove("gfe-play-grid-interactive");
+      grid.removeEventListener("click", this.onGridClick);
+    }
 
     if (!streetArtGrid) return;
 
     this.bga.statusBar.setTitle(_("${you} must mark a street art bonus"));
     this.bga.statusBar.removeActionButtons();
+    this.addUndoButtonIfPossible();
 
     streetArtGrid.removeEventListener("click", this.onStreetArtClick);
     streetArtGrid.classList.add("gfe-street-art-choose-interactive");
     streetArtGrid.addEventListener("click", this.onStreetArtClick);
+  }
+
+  /**
+   * Placement finished — only Undo or End turn (does not advance round by itself).
+   */
+  public showConfirmEndTurn() {
+    this.clearPendingTiles();
+    this.resetPlacementState();
+    this.awaitingEndTurn = true;
+
+    const playerId = this.bga.players.getCurrentPlayerId();
+    const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+    const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
+
+    if (grid) {
+      this.cleanUpPreview(grid);
+      grid.classList.remove("gfe-play-grid-interactive");
+      grid.removeEventListener("click", this.onGridClick);
+    }
+
+    if (streetArtGrid) {
+      streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
+      streetArtGrid.removeEventListener("click", this.onStreetArtClick);
+    }
+
+    this.bga.statusBar.setTitle(
+      this.canUndo ? _("${you}: undo, or end your turn") : _("${you} must end your turn")
+    );
+    this.bga.statusBar.removeActionButtons();
+    this.addUndoButtonIfPossible();
+    this.bga.statusBar.addActionButton(_("End turn"), () => {
+      this.bga.actions.performAction("actEndTurn", {});
+    });
   }
 
   constructor(
@@ -283,11 +353,25 @@ export class PlaceTile {
     this.placeTileArgs = args;
     this.pendingTiles = [];
 
-    //loop over player ids
+    // After refresh: only allow Undo if this turn already has changes
+    if (!this.canUndo) {
+      const ps = this.bga.gameui.gamedatas.playerState;
+      const cells = JSON.parse(String(ps.cells_this_turn || "[]")) as unknown[];
+      const pending = JSON.parse(String(ps.pending_bonus_tiles || "[]")) as unknown[];
+      this.canUndo = cells.length > 0 || pending.length > 0 || Number(ps.street_art_pending) > 0;
+    }
+
     document.querySelectorAll(".gfe-dice-indicator").forEach((el) => {
       el.className = "gfe-dice-indicator";
       el.classList.add(`gfe-dice-${args.diceRoll}`);
     });
+
+    if (isCurrentPlayerActive && this.awaitingEndTurn) {
+      this.showConfirmEndTurn();
+      return;
+    }
+
+    this.awaitingEndTurn = false;
 
     this.bga.statusBar.setTitle(
       isCurrentPlayerActive ? _("${you} must place your tile on the map") : _("Other players are placing their tile...")
@@ -307,6 +391,8 @@ export class PlaceTile {
   }
 
   onLeavingState(args: PlaceTileArgs, isCurrentPlayerActive: boolean) {
+    this.awaitingEndTurn = false;
+    this.canUndo = false;
     this.cleanupActivePlayer();
     this.placeTileArgs = null;
   }
@@ -315,6 +401,8 @@ export class PlaceTile {
     this.placeTileArgs = args;
 
     if (!isCurrentPlayerActive) {
+      this.canUndo = false;
+      this.awaitingEndTurn = false;
       this.bga.statusBar.removeActionButtons();
       this.cleanupActivePlayer();
       this.bga.statusBar.setTitle(_("Other players are placing their tile..."));
@@ -322,5 +410,14 @@ export class PlaceTile {
     }
 
     this.onEnteringState(args, true);
+  }
+
+  public resetAfterUndo() {
+    this.clearPendingTiles();
+    this.resetPlacementState();
+    this.awaitingEndTurn = false;
+    this.canUndo = false;
+    if (!this.placeTileArgs) return;
+    this.onEnteringState(this.placeTileArgs, true);
   }
 }

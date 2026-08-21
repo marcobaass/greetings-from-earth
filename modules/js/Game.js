@@ -413,7 +413,7 @@ class PlaceTile {
             this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
         });
         if (legal && this.tileSelected) {
-            this.bga.statusBar.addActionButton("✔", () => {
+            this.bga.statusBar.addActionButton(_("Confirm placement"), () => {
                 if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
                     return;
                 const cells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
@@ -429,33 +429,87 @@ class PlaceTile {
                 });
             });
         }
+        this.addUndoButtonIfPossible();
+    }
+    setCanUndo(value) {
+        this.canUndo = value;
+    }
+    addUndoButtonIfPossible() {
+        if (!this.canUndo)
+            return;
+        this.bga.statusBar.addActionButton(_("Undo"), () => {
+            this.bga.actions.performAction("actUndo", {});
+        });
     }
     showBonusButtons(pendingTiles) {
         this.pendingTiles = pendingTiles;
         this.resetPlacementState();
         const playerId = this.bga.players.getCurrentPlayerId();
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
         if (!grid)
             return;
+        if (streetArtGrid) {
+            streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
+            streetArtGrid.removeEventListener("click", this.onStreetArtClick);
+        }
         this.cleanUpPreview(grid);
+        // street art step removes the grid handler — put it back so bonus tiles can be positioned
+        grid.removeEventListener("click", this.onGridClick);
+        grid.classList.add("gfe-play-grid-interactive");
+        grid.addEventListener("click", this.onGridClick);
         this.bga.statusBar.setTitle(_("${you} must place your bonus tile on the map"));
         this.updateActionButtons(false, grid);
     }
     clearPendingTiles() {
         this.pendingTiles = [];
+        this.awaitingEndTurn = false;
     }
     showStreetArtChoose() {
         this.clearPendingTiles();
         this.resetPlacementState();
         const playerId = this.bga.players.getCurrentPlayerId();
         const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
+        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        if (grid) {
+            this.cleanUpPreview(grid);
+            grid.classList.remove("gfe-play-grid-interactive");
+            grid.removeEventListener("click", this.onGridClick);
+        }
         if (!streetArtGrid)
             return;
         this.bga.statusBar.setTitle(_("${you} must mark a street art bonus"));
         this.bga.statusBar.removeActionButtons();
+        this.addUndoButtonIfPossible();
         streetArtGrid.removeEventListener("click", this.onStreetArtClick);
         streetArtGrid.classList.add("gfe-street-art-choose-interactive");
         streetArtGrid.addEventListener("click", this.onStreetArtClick);
+    }
+    /**
+     * Placement finished — only Undo or End turn (does not advance round by itself).
+     */
+    showConfirmEndTurn() {
+        this.clearPendingTiles();
+        this.resetPlacementState();
+        this.awaitingEndTurn = true;
+        const playerId = this.bga.players.getCurrentPlayerId();
+        const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+        const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
+        if (grid) {
+            this.cleanUpPreview(grid);
+            grid.classList.remove("gfe-play-grid-interactive");
+            grid.removeEventListener("click", this.onGridClick);
+        }
+        if (streetArtGrid) {
+            streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
+            streetArtGrid.removeEventListener("click", this.onStreetArtClick);
+        }
+        this.bga.statusBar.setTitle(this.canUndo ? _("${you}: undo, or end your turn") : _("${you} must end your turn"));
+        this.bga.statusBar.removeActionButtons();
+        this.addUndoButtonIfPossible();
+        this.bga.statusBar.addActionButton(_("End turn"), () => {
+            this.bga.actions.performAction("actEndTurn", {});
+        });
     }
     constructor(game, bga) {
         this.game = game;
@@ -465,6 +519,10 @@ class PlaceTile {
         this.anchorX = null;
         this.anchorY = null;
         this.pendingTiles = [];
+        /** Client flag: placement done, waiting for End turn / Undo */
+        this.awaitingEndTurn = false;
+        /** True only after a change this turn that can be reverted */
+        this.canUndo = false;
         this.onGridClick = (event) => {
             const cell = event.target;
             if (!this.tileSelected)
@@ -500,11 +558,22 @@ class PlaceTile {
     onEnteringState(args, isCurrentPlayerActive) {
         this.placeTileArgs = args;
         this.pendingTiles = [];
-        //loop over player ids
+        // After refresh: only allow Undo if this turn already has changes
+        if (!this.canUndo) {
+            const ps = this.bga.gameui.gamedatas.playerState;
+            const cells = JSON.parse(String(ps.cells_this_turn || "[]"));
+            const pending = JSON.parse(String(ps.pending_bonus_tiles || "[]"));
+            this.canUndo = cells.length > 0 || pending.length > 0 || Number(ps.street_art_pending) > 0;
+        }
         document.querySelectorAll(".gfe-dice-indicator").forEach((el) => {
             el.className = "gfe-dice-indicator";
             el.classList.add(`gfe-dice-${args.diceRoll}`);
         });
+        if (isCurrentPlayerActive && this.awaitingEndTurn) {
+            this.showConfirmEndTurn();
+            return;
+        }
+        this.awaitingEndTurn = false;
         this.bga.statusBar.setTitle(isCurrentPlayerActive ? _("${you} must place your tile on the map") : _("Other players are placing their tile..."));
         if (isCurrentPlayerActive) {
             const playerId = this.bga.players.getCurrentPlayerId();
@@ -518,18 +587,31 @@ class PlaceTile {
         }
     }
     onLeavingState(args, isCurrentPlayerActive) {
+        this.awaitingEndTurn = false;
+        this.canUndo = false;
         this.cleanupActivePlayer();
         this.placeTileArgs = null;
     }
     onPlayerActivationChange(args, isCurrentPlayerActive) {
         this.placeTileArgs = args;
         if (!isCurrentPlayerActive) {
+            this.canUndo = false;
+            this.awaitingEndTurn = false;
             this.bga.statusBar.removeActionButtons();
             this.cleanupActivePlayer();
             this.bga.statusBar.setTitle(_("Other players are placing their tile..."));
             return;
         }
         this.onEnteringState(args, true);
+    }
+    resetAfterUndo() {
+        this.clearPendingTiles();
+        this.resetPlacementState();
+        this.awaitingEndTurn = false;
+        this.canUndo = false;
+        if (!this.placeTileArgs)
+            return;
+        this.onEnteringState(this.placeTileArgs, true);
     }
 }
 
@@ -909,16 +991,23 @@ class Game {
     }
     async notif_newRound(args) {
         console.log("New round:", args.round, "Dice roll:", args.dice_roll);
+        this.placeTile.clearPendingTiles();
+        this.placeTile.setCanUndo(false);
         this.renderRoundTracker(this.bga.players.getCurrentPlayerId(), args.round);
         const roundEl = document.getElementById("gfe-round");
         if (roundEl)
             roundEl.textContent = String(args.round);
     }
     // ===== Helper functions =====
-    continueAfterPlacement(playerId, streetArtPending, pendingTiles) {
+    continueAfterPlacement(playerId, streetArtPending, pendingTiles, awaitingTurnConfirm = false) {
         const myId = this.bga.players.getCurrentPlayerId();
         if (playerId !== myId)
             return;
+        this.placeTile.setCanUndo(true);
+        if (awaitingTurnConfirm) {
+            this.placeTile.showConfirmEndTurn();
+            return;
+        }
         if (streetArtPending > 0) {
             this.placeTile.showStreetArtChoose();
             return;
@@ -927,8 +1016,7 @@ class Game {
             this.placeTile.showBonusButtons(pendingTiles);
             return;
         }
-        this.placeTile.clearPendingTiles();
-        this.bga.statusBar.removeActionButtons();
+        this.placeTile.showConfirmEndTurn();
     }
     // ===== NOTIFICATIONS =====
     async notif_tilePlaced(args) {
@@ -955,7 +1043,7 @@ class Game {
             gamedatas.playerState.last_rotation = args.rotation;
             gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
         }
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
     }
     async notif_bonusTilePlaced(args) {
         document
@@ -981,7 +1069,7 @@ class Game {
             gamedatas.playerState.last_rotation = args.rotation;
             gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
         }
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
     }
     async notif_streetArtChosen(args) {
         const ps = this.bga.gameui.gamedatas.playerState;
@@ -991,7 +1079,7 @@ class Game {
             this.renderMustSeeUfoTrack(args.player_id, ps.ufo_count, mustsee.length, ps.mustsee_score, ps.ufo_score, ps.monument_collection_score, ps.street_art_score);
         }
         this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
     }
     async notif_turnFinalized(args) {
         this.renderRoundTracker(args.player_id, this.bga.gameui.gamedatas.currentRound);
@@ -1016,6 +1104,43 @@ class Game {
             ps.monument_score = args.monument_score;
             ps.monument_collection_score = args.monument_collection_score;
             ps.street_art_score = args.street_art_score;
+        }
+    }
+    async notif_turnUndone(args) {
+        const playerId = args.player_id;
+        const myId = this.bga.players.getCurrentPlayerId();
+        const layer = document.getElementById(`gfe-tiles-layer-${playerId}`);
+        if (layer) {
+            layer.innerHTML = "";
+        }
+        // 2. if this is MY undo, refresh client memory (needed for legal placement)
+        if (playerId === myId) {
+            this.bga.gameui.gamedatas.coveredCells = args.coveredCells;
+            this.bga.gameui.gamedatas.placements = args.placements;
+            this.bga.gameui.gamedatas.playerState = args.playerState;
+        }
+        // 3. redraw remaining tiles (same loop as setup ~277–288)
+        const ps = args.playerState;
+        const placements = args.placements ?? [];
+        for (const p of placements) {
+            const isLast = Number(p.x) === Number(ps.last_x) &&
+                Number(p.y) === Number(ps.last_y) &&
+                p.tile_type === ps.last_tile_type &&
+                Number(p.rotation) === Number(ps.last_rotation) &&
+                Number(p.mirror) === Number(ps.last_mirror);
+            this.drawTileOnSVG(playerId, p.tile_type, Number(p.x), Number(p.y), Number(p.rotation), Number(p.mirror) === 1, isLast);
+        }
+        // 4. if this is MY undo, reset UI back to “place a tile”
+        if (playerId === myId) {
+            const streetArt = JSON.parse(String(ps.street_art_completed || "[]"));
+            this.renderStreetArtTrack(myId, streetArt, Number(ps.street_art_score));
+            this.placeTile.resetAfterUndo();
+        }
+    }
+    async notif_turnEnded(args) {
+        if (args.player_id === this.bga.players.getCurrentPlayerId()) {
+            this.placeTile.setCanUndo(false);
+            this.placeTile.clearPendingTiles();
         }
     }
 }

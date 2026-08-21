@@ -57,7 +57,7 @@ class Game extends \Bga\GameFramework\Table {
 
         // Init player_state rows — one per player
         foreach (array_keys($players) as $player_id) {
-            static::DbQuery("INSERT INTO `player_state` (`player_id`) VALUES ('$player_id')");
+            static::DbQuery("INSERT INTO `player_state` (`player_id`, `turn_snapshot`) VALUES ('$player_id', '{}')");
         }
 
         // Start the game at NewRound
@@ -192,6 +192,8 @@ class Game extends \Bga\GameFramework\Table {
             throw new UserException(clienttranslate("Illegal tile placement"));
         }
 
+        $this->captureTurnBaselineIfNeeded($playerId);
+
         // insert into player_cells
         $mirrorInt = $mirror ? 1 : 0;
         static::DbQuery("
@@ -239,6 +241,8 @@ class Game extends \Bga\GameFramework\Table {
         if (!$this->isValidPlacement($playerId, $tileType, $x, $y, $rotation, $mirror)) {
             throw new UserException(clienttranslate("Illegal tile placement"));
         }
+
+        $this->captureTurnBaselineIfNeeded($playerId);
 
         // insert into player_cells
         $mirrorInt = $mirror ? 1 : 0;
@@ -429,7 +433,7 @@ class Game extends \Bga\GameFramework\Table {
     }
 
     public function finishPlacementOrWait(int $playerId): bool {
-        // returns true if turn is fully done (caller should finalize + deactivate)
+        // true = nothing left to place (player should End turn or Undo)
         if ($this->hasPendingStreetArt($playerId)) {
             return false;
         }
@@ -437,6 +441,133 @@ class Game extends \Bga\GameFramework\Table {
             return false;
         }
         return true;
+    }
+
+    /**
+     * True after placements are done for this turn, until End turn / Undo.
+     * Derived from cells_this_turn — no extra DB column.
+     */
+    public function isAwaitingTurnConfirm(int $playerId): bool {
+        if ($this->hasTurnEnded($playerId)) {
+            return false;
+        }
+        if (!$this->finishPlacementOrWait($playerId)) {
+            return false;
+        }
+        $cells = $this->getCellsThisTurn($playerId);
+        return is_array($cells) && count($cells) > 0;
+    }
+
+    public function hasTurnEnded(int $playerId): bool {
+        $state = $this->getObjectFromDb(
+            "SELECT `turn_ended` FROM `player_state` WHERE `player_id` = '$playerId'"
+        );
+        return (int) ($state["turn_ended"] ?? 0) === 1;
+    }
+
+    public function setTurnEnded(int $playerId, bool $ended): void {
+        $value = $ended ? 1 : 0;
+        static::DbQuery(
+            "UPDATE `player_state` SET `turn_ended` = $value WHERE `player_id` = '$playerId'"
+        );
+    }
+
+    /**
+     * Players who still must act this round (place and/or press End turn).
+     */
+    public function getPlayersStillInRound(): array {
+        $players = $this->loadPlayersBasicInfos();
+        $ids = [];
+        foreach (array_keys($players) as $playerId) {
+            if (!$this->hasTurnEnded((int) $playerId)) {
+                $ids[] = (int) $playerId;
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * Keep everyone who has not pressed End turn multiactive.
+     * Prevents the framework from treating a placement as “done” and jumping to NewRound.
+     */
+    public function keepPlayersInRoundActive(string $nextStateIfNone = NewRound::class): void {
+        $stillIn = $this->getPlayersStillInRound();
+        if (count($stillIn) === 0) {
+            $this->gamestate->setAllPlayersNonMultiactive($nextStateIfNone);
+            return;
+        }
+        $this->gamestate->setPlayersMultiactive($stillIn, $nextStateIfNone, true);
+    }
+
+    /**
+     * Notify fields after a placement (does not end the turn).
+     */
+    public function afterPlacementStatus(int $playerId): array {
+        $state = $this->getObjectFromDb(
+            "SELECT `street_art_pending`, `street_art_completed` FROM `player_state` WHERE `player_id` = '$playerId'"
+        );
+        return [
+            "awaiting_turn_confirm" => $this->isAwaitingTurnConfirm($playerId),
+            "pending_tiles" => $this->getPendingBonusTiles($playerId),
+            "street_art_pending" => (int) $state["street_art_pending"],
+            "street_art_completed" => json_decode($state["street_art_completed"] ?? "[]", true) ?? [],
+        ];
+    }
+
+    /**
+     * After End turn: wipe undo photo so a later round can never restore this turn.
+     */
+    public function invalidateTurnUndo(int $playerId): void {
+        static::DbQuery(
+            "UPDATE `player_state` SET `turn_snapshot` = '{}'
+             WHERE `player_id` = '$playerId'"
+        );
+    }
+
+    /**
+     * True only if there is a valid snapshot AND the player has changed something since it was taken.
+     */
+    public function canUndoTurn(int $playerId): bool {
+        if ($this->hasTurnEnded($playerId)) {
+            return false;
+        }
+
+        $row = $this->getObjectFromDb(
+            "SELECT `turn_snapshot` FROM `player_state` WHERE `player_id` = '$playerId'"
+        );
+        $snapshot = json_decode($row["turn_snapshot"] ?? "{}", true);
+        if (!is_array($snapshot) || !isset($snapshot["max_placement_id"])) {
+            return false;
+        }
+
+        $maxPlacementId = (int) $snapshot["max_placement_id"];
+        $newerCount = (int) $this->getUniqueValueFromDB(
+            "SELECT COUNT(*) FROM `player_placements`
+             WHERE `player_id` = $playerId AND `placement_id` > $maxPlacementId"
+        );
+        if ($newerCount > 0) {
+            return true;
+        }
+
+        $state = $this->getObjectFromDb(
+            "SELECT `street_art_pending`, `street_art_completed`, `pending_bonus_tiles`, `cells_this_turn`
+             FROM `player_state` WHERE `player_id` = '$playerId'"
+        );
+
+        if ((int) $state["street_art_pending"] !== (int) $snapshot["street_art_pending"]) {
+            return true;
+        }
+        if ($state["street_art_completed"] !== $snapshot["street_art_completed"]) {
+            return true;
+        }
+        if ($state["pending_bonus_tiles"] !== $snapshot["pending_bonus_tiles"]) {
+            return true;
+        }
+        if ($state["cells_this_turn"] !== $snapshot["cells_this_turn"]) {
+            return true;
+        }
+
+        return false;
     }
 
     // ===== CELLS THIS TURN =====
@@ -468,6 +599,141 @@ class Game extends \Bga\GameFramework\Table {
             "UPDATE `player_state` SET `cells_this_turn` = '[]'
              WHERE `player_id` = '$playerId'"
         );
+    }
+
+    // ===== UNDO TURN =====
+
+    /**
+     * Before the first placement of a turn, refresh the undo baseline.
+     * Guarantees max_placement_id includes all previous rounds even if NewRound snapshot was stale.
+     */
+    public function captureTurnBaselineIfNeeded(int $playerId): void {
+        $cells = $this->getCellsThisTurn($playerId);
+        if (is_array($cells) && count($cells) > 0) {
+            return;
+        }
+        if ($this->hasPendingStreetArt($playerId) || $this->hasPendingBonusTiles($playerId)) {
+            return;
+        }
+        $this->saveTurnSnapshot($playerId);
+    }
+
+    public function saveTurnSnapshot(int $playerId): void {
+        $maxPlacementId = (int) $this->getUniqueValueFromDB(
+            "SELECT COALESCE(MAX(`placement_id`), 0)
+             FROM `player_placements`
+             WHERE `player_id` = $playerId"
+        );
+
+        $state = $this->getObjectFromDb(
+            "SELECT
+            `last_x`, `last_y`, `last_tile_type`, `last_rotation`, `last_mirror`,
+            `has_started`, `currywurst_count`, `escooter_count`,
+            `street_art_completed`, `street_art_score`, `street_art_pending`,
+            `pending_bonus_tiles`, `cells_this_turn`
+            FROM `player_state`
+            WHERE `player_id` = '$playerId'"
+        );
+
+        $snapshot = [
+            "max_placement_id" => $maxPlacementId,
+            "last_x" => $state["last_x"],
+            "last_y" => $state["last_y"],
+            "last_tile_type" => $state["last_tile_type"],
+            "last_rotation" => (int) $state["last_rotation"],
+            "last_mirror" => (int) $state["last_mirror"],
+            "has_started" => (int) $state["has_started"],
+            "currywurst_count" => (int) $state["currywurst_count"],
+            "escooter_count" => (int) $state["escooter_count"],
+            "street_art_completed" => $state["street_art_completed"],
+            "street_art_score" => (int) $state["street_art_score"],
+            "street_art_pending" => (int) $state["street_art_pending"],
+            "pending_bonus_tiles" => $state["pending_bonus_tiles"],
+            "cells_this_turn" => $state["cells_this_turn"],
+        ];
+
+        $json = static::escapeStringForDB(json_encode($snapshot));
+        static::DbQuery(
+            "UPDATE `player_state` SET `turn_snapshot` = '$json' WHERE `player_id` = '$playerId'"
+        );
+    }
+
+    public function restoreTurnSnapshot(int $playerId): void {
+        $row = $this->getObjectFromDb("SELECT `turn_snapshot` FROM `player_state` WHERE `player_id` = '$playerId'");
+        $snapshot = json_decode($row["turn_snapshot"] ?? "{}", true);
+
+        if (!is_array($snapshot) || !isset($snapshot["max_placement_id"])) {
+            throw new UserException(clienttranslate("Nothing to undo"));
+        }
+
+        $maxPlacementId = (int) $snapshot["max_placement_id"];
+
+        $lastX = $snapshot["last_x"] === null ? "NULL" : "'" . $snapshot["last_x"] . "'";
+        $lastY = $snapshot["last_y"] === null ? "NULL" : "'" . $snapshot["last_y"] . "'";
+        $lastTileType = $snapshot["last_tile_type"] === null ? "NULL" : "'" . $snapshot["last_tile_type"] . "'";
+
+        static::DbQuery(
+            "UPDATE `player_state` SET
+            `last_x` = $lastX,
+            `last_y` = $lastY,
+            `last_tile_type` = $lastTileType,
+            `last_rotation` = " .
+                (int) $snapshot["last_rotation"] .
+                ",
+            `last_mirror` = " .
+                (int) $snapshot["last_mirror"] .
+                ",
+            `has_started` = " .
+                (int) $snapshot["has_started"] .
+                ",
+            `currywurst_count` = " .
+                (int) $snapshot["currywurst_count"] .
+                ",
+            `escooter_count` = " .
+                (int) $snapshot["escooter_count"] .
+                ",
+            `street_art_completed` = '" .
+                $snapshot["street_art_completed"] .
+                "',
+            `street_art_score` = " .
+                (int) $snapshot["street_art_score"] .
+                ",
+            `street_art_pending` = " .
+                (int) $snapshot["street_art_pending"] .
+                ",
+            `pending_bonus_tiles` = '" .
+                $snapshot["pending_bonus_tiles"] .
+                "',
+            `cells_this_turn` = '" .
+                $snapshot["cells_this_turn"] .
+                "'
+         WHERE `player_id` = '$playerId'"
+        );
+
+        $placements = $this->getObjectListFromDB(
+            "SELECT `placement_id`, `tile_type`, `x`, `y`, `rotation`, `mirror`
+         FROM `player_placements`
+         WHERE `player_id` = '$playerId' AND `placement_id` > $maxPlacementId"
+        );
+        foreach ($placements as $placement) {
+            $cells = getShapeCells(
+                $placement["tile_type"],
+                (int) $placement["x"],
+                (int) $placement["y"],
+                (int) $placement["rotation"],
+                ((int) $placement["mirror"]) === 1
+            );
+            foreach ($cells as $cell) {
+                $cx = (int) $cell[0];
+                $cy = (int) $cell[1];
+                static::DbQuery(
+                    "DELETE FROM `player_cells`
+                    WHERE `player_id` = '$playerId' AND `x` = $cx AND `y` = $cy"
+                );
+            }
+            $placementId = (int) $placement["placement_id"];
+            static::DbQuery("DELETE FROM `player_placements` WHERE `placement_id` = $placementId");
+        }
     }
 
     // ===== FINALIZE TURN =====

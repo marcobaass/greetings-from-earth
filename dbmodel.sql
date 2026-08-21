@@ -78,6 +78,8 @@ CREATE TABLE IF NOT EXISTS `player_state` (
     `monument_score`        TINYINT(2)      NOT NULL DEFAULT 0,
     `monument_collection_score` SMALLINT(2)      NOT NULL DEFAULT 0,
     `cells_this_turn`        VARCHAR(512)    NOT NULL DEFAULT '[]',
+    `turn_snapshot` TEXT NOT NULL,
+    `turn_ended`             TINYINT(1)      NOT NULL DEFAULT 0,
     PRIMARY KEY (`player_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

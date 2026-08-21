@@ -87,7 +87,7 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] SVGs also on Buttons
 - [x] Last tile placed differently colored
 - [x] Better visible where to place and where forbidden
-- [ ] implement 'undo'
+- [x] implement 'undo' (turn snapshot + Done/Undo after place)
 - [ ] End Scoring
 - [ ] prevent hover on street art track and board grid when no streetart to select or no tile for the board choosen
 

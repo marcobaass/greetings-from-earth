@@ -322,6 +322,8 @@ export class Game {
 
   async notif_newRound(args: NotifNewRoundArgs) {
     console.log("New round:", args.round, "Dice roll:", args.dice_roll);
+    this.placeTile.clearPendingTiles();
+    this.placeTile.setCanUndo(false);
     this.renderRoundTracker(this.bga.players.getCurrentPlayerId(), args.round);
     const roundEl = document.getElementById("gfe-round");
     if (roundEl) roundEl.textContent = String(args.round);
@@ -329,9 +331,22 @@ export class Game {
 
   // ===== Helper functions =====
 
-  private continueAfterPlacement(playerId: number, streetArtPending: number, pendingTiles: string[]) {
+  private continueAfterPlacement(
+    playerId: number,
+    streetArtPending: number,
+    pendingTiles: string[],
+    awaitingTurnConfirm: boolean = false
+  ) {
     const myId = this.bga.players.getCurrentPlayerId();
     if (playerId !== myId) return;
+
+    this.placeTile.setCanUndo(true);
+
+    if (awaitingTurnConfirm) {
+      this.placeTile.showConfirmEndTurn();
+      return;
+    }
+
     if (streetArtPending > 0) {
       this.placeTile.showStreetArtChoose();
       return;
@@ -340,8 +355,7 @@ export class Game {
       this.placeTile.showBonusButtons(pendingTiles);
       return;
     }
-    this.placeTile.clearPendingTiles();
-    this.bga.statusBar.removeActionButtons();
+    this.placeTile.showConfirmEndTurn();
   }
 
   // ===== NOTIFICATIONS =====
@@ -377,7 +391,12 @@ export class Game {
       gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
     }
 
-    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
+    this.continueAfterPlacement(
+      args.player_id,
+      args.street_art_pending ?? 0,
+      args.pending_tiles ?? [],
+      !!args.awaiting_turn_confirm
+    );
   }
 
   async notif_bonusTilePlaced(args: NotifTilePlacedArgs) {
@@ -411,7 +430,12 @@ export class Game {
       gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
     }
 
-    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
+    this.continueAfterPlacement(
+      args.player_id,
+      args.street_art_pending ?? 0,
+      args.pending_tiles ?? [],
+      !!args.awaiting_turn_confirm
+    );
   }
 
   async notif_streetArtChosen(args: NotifStreetArtChosenArgs) {
@@ -433,7 +457,12 @@ export class Game {
 
     this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
 
-    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
+    this.continueAfterPlacement(
+      args.player_id,
+      args.street_art_pending ?? 0,
+      args.pending_tiles ?? [],
+      !!args.awaiting_turn_confirm
+    );
   }
 
   async notif_turnFinalized(args: NotifTurnFinalizedArgs) {
@@ -478,6 +507,50 @@ export class Game {
       ps.monument_score = args.monument_score;
       ps.monument_collection_score = args.monument_collection_score;
       ps.street_art_score = args.street_art_score;
+    }
+  }
+
+  async notif_turnUndone(args: NotifTurnUndoneArgs) {
+    const playerId = args.player_id;
+    const myId = this.bga.players.getCurrentPlayerId();
+    const layer = document.getElementById(`gfe-tiles-layer-${playerId}`);
+    if (layer) {
+      layer.innerHTML = "";
+    }
+
+    // 2. if this is MY undo, refresh client memory (needed for legal placement)
+    if (playerId === myId) {
+      this.bga.gameui.gamedatas.coveredCells = args.coveredCells;
+      this.bga.gameui.gamedatas.placements = args.placements;
+      this.bga.gameui.gamedatas.playerState = args.playerState;
+    }
+
+    // 3. redraw remaining tiles (same loop as setup ~277–288)
+    const ps = args.playerState;
+    const placements = args.placements ?? [];
+    for (const p of placements) {
+      const isLast =
+        Number(p.x) === Number(ps.last_x) &&
+        Number(p.y) === Number(ps.last_y) &&
+        p.tile_type === ps.last_tile_type &&
+        Number(p.rotation) === Number(ps.last_rotation) &&
+        Number(p.mirror) === Number(ps.last_mirror);
+      this.drawTileOnSVG(playerId, p.tile_type, Number(p.x), Number(p.y), Number(p.rotation), Number(p.mirror) === 1, isLast);
+    }
+
+    // 4. if this is MY undo, reset UI back to “place a tile”
+    if (playerId === myId) {
+      const streetArt = JSON.parse(String(ps.street_art_completed || "[]")) as string[];
+      this.renderStreetArtTrack(myId, streetArt, Number(ps.street_art_score));
+
+      this.placeTile.resetAfterUndo();
+    }
+  }
+
+  async notif_turnEnded(args: { player_id: number; player_name: string }) {
+    if (args.player_id === this.bga.players.getCurrentPlayerId()) {
+      this.placeTile.setCanUndo(false);
+      this.placeTile.clearPendingTiles();
     }
   }
 }
