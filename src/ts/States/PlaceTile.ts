@@ -1,6 +1,6 @@
 import { Game } from "../Game";
 import { isPlacementLegal } from "../placement";
-import { computeTileShift, getShapeCells, isInsideGrid, cellsToOutlinePath } from "../tiles";
+import { computeTileShift, getShapeCells, isInsideGrid, cellsToOutlinePath, tileButtonHtml } from "../tiles";
 
 export class PlaceTile {
   private tileSelected: string | null = null;
@@ -190,7 +190,7 @@ export class PlaceTile {
       this.pendingTiles.length > 0 ? this.pendingTiles : [...this.placeTileArgs.tileOptions, ...this.placeTileArgs.alwaysAvailableTiles];
 
     allTiles.forEach((tile) => {
-      this.bga.statusBar.addActionButton(tile, () => {
+      this.bga.statusBar.addActionButton(tileButtonHtml(tile), () => {
         this.tileSelected = tile;
         this.anchorX = 0;
         this.anchorY = 0;

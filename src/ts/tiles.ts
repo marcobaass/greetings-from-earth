@@ -167,3 +167,26 @@ function squiggleEdge(ax: number, ay: number, bx: number, by: number): string {
   const t = edgeNudge(ax, ay, bx, by);
   return `M ${ax} ${ay} L ${mx + px * t} ${my + py * t} L ${bx} ${by} `;
 }
+
+export function tileButtonHtml(tileType: string) {
+  const shape = getShapeCells(tileType, 0, 0, 0, false);
+  const outline = cellsToOutlinePath(shape);
+
+  const xs = shape.map(([x]) => x);
+  const ys = shape.map(([, y]) => y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs) + 1;
+  const maxY = Math.max(...ys) + 1;
+
+  const box = 4;
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const originX = minX - (box - width) / 2;
+  const originY = minY - (box - height) / 2;
+
+  const viewBox = `${originX} ${originY} ${box} ${box}`;
+
+  return `<svg width="40" height="40" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg"><path d="${outline}" fill="none" stroke="white" stroke-width="0.25"/></svg>`;
+}
