@@ -84,22 +84,22 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] Roundtracker top of sheet
 - [x] Live score update on sheet
 - [x] Indicator for square on tiles where to place
-- [ ] SVGs also on Buttons
-- [ ] Last tile placed differently colored
-- [ ] Better visible where to place and where forbidden
+- [x] SVGs also on Buttons
+- [x] Last tile placed differently colored
+- [x] Better visible where to place and where forbidden
 - [ ] implement 'undo'
 - [ ] End Scoring
 - [ ] prevent hover on street art track and board grid when no streetart to select or no tile for the board choosen
 
 ## Later — placement UX
 
-- [ ] Valid-placement hint: highlight where a tile may legally touch (S-Bahn on first turn; last tile + S-Bahn later)
+- [?] Valid-placement hint: highlight where a tile may legally touch (S-Bahn on first turn; last tile + S-Bahn later)
 - [ ] tile on mouse first?
 - [x] SVG preview overlay (replace or layer on CSS cells)
 - [ ] SVG scribbled circles on tracks and streetart
 - [ ] animations for circles
 - [ ] ring controls on board (Ark Nova style)
-- [ ] Soundeffects
+- [?] Soundeffects
 
 ---
 

@@ -75,6 +75,10 @@
   stroke: none;
 }
 
+.gfe-tile-last .gfe-tile-cell {
+  fill: rgba(51, 255, 0, 0.45);
+}
+
 .gfe-cell-anchor {
   background-image: linear-gradient(#1a1a1a, #1a1a1a), linear-gradient(#1a1a1a, #1a1a1a);
   background-size:

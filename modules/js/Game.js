@@ -790,7 +790,7 @@ class Game {
             streetArtScoreEl.innerHTML = `<p class="gfe-track-score-blue">${streetArtScoreString}</p>`;
         }
     }
-    drawTileOnSVG(playerId, tileType, anchorX, anchorY, rotation, mirror) {
+    drawTileOnSVG(playerId, tileType, anchorX, anchorY, rotation, mirror, isLastTile = false) {
         const tilesLayerEl = document.getElementById(`gfe-tiles-layer-${playerId}`);
         if (!tilesLayerEl)
             return;
@@ -815,6 +815,9 @@ class Game {
         path.classList.add("gfe-tile-outline");
         group.appendChild(path);
         tilesLayerEl.appendChild(group);
+        if (isLastTile) {
+            group.classList.add("gfe-tile-last");
+        }
     }
     // ===== GAME SETUP =====
     // This is called when the game is setup
@@ -882,8 +885,14 @@ class Game {
         const myId = this.bga.players.getCurrentPlayerId();
         this.renderRoundTracker(myId, gamedatas.currentRound);
         const placements = gamedatas.placements ?? [];
+        const ps = gamedatas.playerState;
         for (const p of placements) {
-            this.drawTileOnSVG(myId, p.tile_type, Number(p.x), Number(p.y), Number(p.rotation), Number(p.mirror) === 1);
+            const isLast = Number(p.x) === Number(ps.last_x) &&
+                Number(p.y) === Number(ps.last_y) &&
+                p.tile_type === ps.last_tile_type &&
+                Number(p.rotation) === Number(ps.last_rotation) &&
+                Number(p.mirror) === Number(ps.last_mirror);
+            this.drawTileOnSVG(myId, p.tile_type, Number(p.x), Number(p.y), Number(p.rotation), Number(p.mirror) === 1, isLast);
         }
         const monument = JSON.parse(String(gamedatas.playerState.monument_completed || "[]"));
         const streetArt = JSON.parse(String(gamedatas.playerState.street_art_completed || "[]"));
@@ -923,7 +932,11 @@ class Game {
     }
     // ===== NOTIFICATIONS =====
     async notif_tilePlaced(args) {
-        this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror);
+        document
+            .getElementById(`gfe-tiles-layer-${args.player_id}`)
+            ?.querySelectorAll(".gfe-tile-last")
+            .forEach((el) => el.classList.remove("gfe-tile-last"));
+        this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror, true);
         const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
         // this.renderCoveredCells(
         //   args.player_id,
@@ -945,7 +958,11 @@ class Game {
         this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? []);
     }
     async notif_bonusTilePlaced(args) {
-        this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror);
+        document
+            .getElementById(`gfe-tiles-layer-${args.player_id}`)
+            ?.querySelectorAll(".gfe-tile-last")
+            .forEach((el) => el.classList.remove("gfe-tile-last"));
+        this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror, true);
         const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
         // this.renderCoveredCells(
         //   args.player_id,
