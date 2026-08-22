@@ -917,8 +917,12 @@ class Game {
             </div>
         `);
         // Set up player boards
-        Object.entries(gamedatas.players).forEach(([pId, player]) => {
-            const playerId = Number(pId);
+        const myId = this.bga.players.getCurrentPlayerId();
+        const orderedPlayerIds = [myId, ...gamedatas.playerorder.map((id) => Number(id)).filter((id) => id !== myId)];
+        orderedPlayerIds.forEach((playerId) => {
+            const player = gamedatas.players[playerId];
+            if (!player)
+                return;
             document.getElementById("gfe-player-boards").insertAdjacentHTML("beforeend", `
                 <div id="gfe-board-${playerId}" class="gfe-player-board">
                     <strong>${player.name}</strong>
@@ -965,7 +969,6 @@ class Game {
             }
         });
         // Set up tracks and covered cells
-        const myId = this.bga.players.getCurrentPlayerId();
         Object.keys(gamedatas.players).forEach((pId) => {
             this.renderRoundTracker(Number(pId), gamedatas.currentRound);
         });

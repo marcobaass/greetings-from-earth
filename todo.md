@@ -89,8 +89,8 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] Better visible where to place and where forbidden
 - [x] implement 'undo' (turn snapshot + Done/Undo after place)
 - [x] End Scoring
-- [ ] Circles for Roundtracker on other players board don't show on players board
-- [ ] diffrent player sheet on top than actuall player
+- [x] Circles for Roundtracker on other players board don't show on players board
+- [x] diffrent player sheet on top than actuall player
 - [ ] single and two square tiles also as alternative for bonus tiles
 - [ ] layout shift through buttons top
 - [ ] prevent hover on street art track and board grid when no streetart to select or no tile for the board choosen
