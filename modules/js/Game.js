@@ -800,6 +800,7 @@ class Game {
             { top: 14.5, left: 85.6 },
             { top: 26.9, left: 91.9 }
         ];
+        roundTracker.innerHTML = "";
         for (let i = 0; i < round; i++) {
             roundTracker.innerHTML += `<div class="gfe-round-tracker-circle" style="top: ${ROUNDS_POSITIONS[i].top}%; left: ${ROUNDS_POSITIONS[i].left}%"></div>`;
         }
@@ -965,7 +966,9 @@ class Game {
         });
         // Set up tracks and covered cells
         const myId = this.bga.players.getCurrentPlayerId();
-        this.renderRoundTracker(myId, gamedatas.currentRound);
+        Object.keys(gamedatas.players).forEach((pId) => {
+            this.renderRoundTracker(Number(pId), gamedatas.currentRound);
+        });
         const placements = gamedatas.placements ?? [];
         const ps = gamedatas.playerState;
         for (const p of placements) {
@@ -993,7 +996,10 @@ class Game {
         console.log("New round:", args.round, "Dice roll:", args.dice_roll);
         this.placeTile.clearPendingTiles();
         this.placeTile.setCanUndo(false);
-        this.renderRoundTracker(this.bga.players.getCurrentPlayerId(), args.round);
+        this.bga.gameui.gamedatas.currentRound = args.round;
+        Object.keys(this.bga.gameui.gamedatas.players).forEach((pId) => {
+            this.renderRoundTracker(Number(pId), args.round);
+        });
         const roundEl = document.getElementById("gfe-round");
         if (roundEl)
             roundEl.textContent = String(args.round);
@@ -1082,7 +1088,6 @@ class Game {
         this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
     }
     async notif_turnFinalized(args) {
-        this.renderRoundTracker(args.player_id, this.bga.gameui.gamedatas.currentRound);
         const monument = Array.isArray(args.monument_completed)
             ? args.monument_completed
             : JSON.parse(String(args.monument_completed || "[]"));

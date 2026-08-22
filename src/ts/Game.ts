@@ -44,6 +44,8 @@ export class Game {
       { top: 26.9, left: 91.9 }
     ];
 
+    roundTracker.innerHTML = "";
+
     for (let i = 0; i < round; i++) {
       roundTracker.innerHTML += `<div class="gfe-round-tracker-circle" style="top: ${ROUNDS_POSITIONS[i].top}%; left: ${ROUNDS_POSITIONS[i].left}%"></div>`;
     }
@@ -272,7 +274,9 @@ export class Game {
 
     const myId = this.bga.players.getCurrentPlayerId();
 
-    this.renderRoundTracker(myId, gamedatas.currentRound);
+    Object.keys(gamedatas.players).forEach((pId) => {
+      this.renderRoundTracker(Number(pId), gamedatas.currentRound);
+    });
 
     const placements = gamedatas.placements ?? [];
     const ps = gamedatas.playerState;
@@ -324,19 +328,17 @@ export class Game {
     console.log("New round:", args.round, "Dice roll:", args.dice_roll);
     this.placeTile.clearPendingTiles();
     this.placeTile.setCanUndo(false);
-    this.renderRoundTracker(this.bga.players.getCurrentPlayerId(), args.round);
+    this.bga.gameui.gamedatas.currentRound = args.round;
+    Object.keys(this.bga.gameui.gamedatas.players).forEach((pId) => {
+      this.renderRoundTracker(Number(pId), args.round);
+    });
     const roundEl = document.getElementById("gfe-round");
     if (roundEl) roundEl.textContent = String(args.round);
   }
 
   // ===== Helper functions =====
 
-  private continueAfterPlacement(
-    playerId: number,
-    streetArtPending: number,
-    pendingTiles: string[],
-    awaitingTurnConfirm: boolean = false
-  ) {
+  private continueAfterPlacement(playerId: number, streetArtPending: number, pendingTiles: string[], awaitingTurnConfirm: boolean = false) {
     const myId = this.bga.players.getCurrentPlayerId();
     if (playerId !== myId) return;
 
@@ -391,12 +393,7 @@ export class Game {
       gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
     }
 
-    this.continueAfterPlacement(
-      args.player_id,
-      args.street_art_pending ?? 0,
-      args.pending_tiles ?? [],
-      !!args.awaiting_turn_confirm
-    );
+    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
   }
 
   async notif_bonusTilePlaced(args: NotifTilePlacedArgs) {
@@ -430,12 +427,7 @@ export class Game {
       gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
     }
 
-    this.continueAfterPlacement(
-      args.player_id,
-      args.street_art_pending ?? 0,
-      args.pending_tiles ?? [],
-      !!args.awaiting_turn_confirm
-    );
+    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
   }
 
   async notif_streetArtChosen(args: NotifStreetArtChosenArgs) {
@@ -457,17 +449,10 @@ export class Game {
 
     this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
 
-    this.continueAfterPlacement(
-      args.player_id,
-      args.street_art_pending ?? 0,
-      args.pending_tiles ?? [],
-      !!args.awaiting_turn_confirm
-    );
+    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
   }
 
   async notif_turnFinalized(args: NotifTurnFinalizedArgs) {
-    this.renderRoundTracker(args.player_id, this.bga.gameui.gamedatas.currentRound);
-
     const monument = Array.isArray(args.monument_completed)
       ? args.monument_completed
       : (JSON.parse(String(args.monument_completed || "[]")) as string[]);
