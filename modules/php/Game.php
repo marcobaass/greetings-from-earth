@@ -281,7 +281,7 @@ class Game extends \Bga\GameFramework\Table {
             return cellKey((int) $cell[0], (int) $cell[1]);
         }, $cells);
 
-        $this->removePendingBonusTile($playerId, $tileType);
+        $this->spendBonusPlacement($playerId, $tileType);
 
         $this->checkBonusTilesFromCells($playerId, $cellKeys);
         $this->checkStreetArt($playerId, $cellKeys);
@@ -379,24 +379,83 @@ class Game extends \Bga\GameFramework\Table {
         }
 
         if (isset($reward["tile"])) {
-            $tiles = $this->getPendingBonusTiles($playerId);
-            $tiles[] = $reward["tile"];
-
-            static::DbQuery(
-                "UPDATE `player_state` SET `pending_bonus_tiles` = '" . json_encode($tiles) . "' WHERE `player_id` = '$playerId'"
-            );
+            $this->grantBonusTile($playerId, $reward["tile"]);
         }
     }
 
     // ===== BONUS TILE HELPERS =====
+    // Pool = specific bonus shapes still available. Slots = remaining placements
+    // (shape or I1/I2). Alternatives spend a slot and leave the pool unchanged.
+    // When slots hit 0, leftover pool tiles are discarded.
 
-    public function hasPendingBonusTiles(int $playerId): bool {
+    private function getPendingBonusState(int $playerId): array {
         $state = $this->getObjectFromDb(
-            "SELECT `pending_bonus_tiles` FROM `player_state`
+            "SELECT `pending_bonus_tiles`, `pending_bonus_slots` FROM `player_state`
              WHERE `player_id` = '$playerId'"
         );
-        $tiles = json_decode($state["pending_bonus_tiles"], true);
-        return count($tiles) > 0;
+        $tiles = json_decode($state["pending_bonus_tiles"] ?? "[]", true);
+        return [
+            "tiles" => is_array($tiles) ? $tiles : [],
+            "slots" => (int) ($state["pending_bonus_slots"] ?? 0),
+        ];
+    }
+
+    private function setPendingBonusState(int $playerId, array $tiles, int $slots): void {
+        if ($slots <= 0) {
+            $tiles = [];
+            $slots = 0;
+        }
+        $tilesJson = json_encode(array_values($tiles));
+        static::DbQuery(
+            "UPDATE `player_state` SET `pending_bonus_tiles` = '$tilesJson', `pending_bonus_slots` = $slots
+             WHERE `player_id` = '$playerId'"
+        );
+    }
+
+    public function hasPendingBonusTiles(int $playerId): bool {
+        return $this->getPendingBonusSlots($playerId) > 0;
+    }
+
+    public function getPendingBonusSlots(int $playerId): int {
+        return $this->getPendingBonusState($playerId)["slots"];
+    }
+
+    public function isValidBonusTileChoice(int $playerId, string $tileType): bool {
+        if ($this->getPendingBonusSlots($playerId) <= 0) {
+            return false;
+        }
+        if (in_array($tileType, ALWAYS_AVAILABLE_TILES, true)) {
+            return true;
+        }
+        return in_array($tileType, $this->getPendingBonusTiles($playerId), true);
+    }
+
+    public function grantBonusTile(int $playerId, string $tileType): void {
+        $state = $this->getPendingBonusState($playerId);
+        $state["tiles"][] = $tileType;
+        $this->setPendingBonusState($playerId, $state["tiles"], $state["slots"] + 1);
+    }
+
+    /**
+     * Spend one bonus placement. I1/I2 never remove a pool tile; a pool shape does.
+     * Remaining pool is discarded when no slots are left.
+     */
+    public function spendBonusPlacement(int $playerId, string $tileType): void {
+        $state = $this->getPendingBonusState($playerId);
+        if ($state["slots"] <= 0) {
+            throw new UserException(clienttranslate("No bonus tile to place"));
+        }
+
+        $tiles = $state["tiles"];
+        if (!in_array($tileType, ALWAYS_AVAILABLE_TILES, true)) {
+            $index = array_search($tileType, $tiles, true);
+            if ($index === false) {
+                throw new UserException("Tile type not found in pending bonus tiles");
+            }
+            array_splice($tiles, $index, 1);
+        }
+
+        $this->setPendingBonusState($playerId, $tiles, $state["slots"] - 1);
     }
 
     public function hasPendingStreetArt(int $playerId): bool {
@@ -408,33 +467,11 @@ class Game extends \Bga\GameFramework\Table {
     }
 
     public function getPendingBonusTiles(int $playerId): array {
-        $state = $this->getObjectFromDb(
-            "SELECT `pending_bonus_tiles` FROM `player_state`
-             WHERE `player_id` = '$playerId'"
-        );
-        return json_decode($state["pending_bonus_tiles"], true);
+        return $this->getPendingBonusState($playerId)["tiles"];
     }
 
     public function clearPendingBonusTiles(int $playerId): void {
-        static::DbQuery(
-            "UPDATE `player_state` SET `pending_bonus_tiles` = '[]'
-             WHERE `player_id` = '$playerId'"
-        );
-    }
-
-    public function removePendingBonusTile(int $playerId, string $tileType): void {
-        $tiles = $this->getPendingBonusTiles($playerId);
-        $index = array_search($tileType, $tiles, true);
-        if ($index === false) {
-            throw new UserException("Tile type not found in pending bonus tiles");
-        }
-        array_splice($tiles, $index, 1);
-        static::DbQuery(
-            "UPDATE `player_state` SET `pending_bonus_tiles` = '" .
-                json_encode($tiles) .
-                "'
-            WHERE `player_id` = '$playerId'"
-        );
+        $this->setPendingBonusState($playerId, [], 0);
     }
 
     public function finishPlacementOrWait(int $playerId): bool {
@@ -549,7 +586,7 @@ class Game extends \Bga\GameFramework\Table {
         }
 
         $state = $this->getObjectFromDb(
-            "SELECT `street_art_pending`, `street_art_completed`, `pending_bonus_tiles`, `cells_this_turn`
+            "SELECT `street_art_pending`, `street_art_completed`, `pending_bonus_tiles`, `pending_bonus_slots`, `cells_this_turn`
              FROM `player_state` WHERE `player_id` = '$playerId'"
         );
 
@@ -560,6 +597,9 @@ class Game extends \Bga\GameFramework\Table {
             return true;
         }
         if ($state["pending_bonus_tiles"] !== $snapshot["pending_bonus_tiles"]) {
+            return true;
+        }
+        if ((int) $state["pending_bonus_slots"] !== (int) ($snapshot["pending_bonus_slots"] ?? 0)) {
             return true;
         }
         if ($state["cells_this_turn"] !== $snapshot["cells_this_turn"]) {
@@ -629,7 +669,7 @@ class Game extends \Bga\GameFramework\Table {
             `last_x`, `last_y`, `last_tile_type`, `last_rotation`, `last_mirror`,
             `has_started`, `currywurst_count`, `escooter_count`,
             `street_art_completed`, `street_art_score`, `street_art_pending`,
-            `pending_bonus_tiles`, `cells_this_turn`
+            `pending_bonus_tiles`, `pending_bonus_slots`, `cells_this_turn`
             FROM `player_state`
             WHERE `player_id` = '$playerId'"
         );
@@ -648,6 +688,7 @@ class Game extends \Bga\GameFramework\Table {
             "street_art_score" => (int) $state["street_art_score"],
             "street_art_pending" => (int) $state["street_art_pending"],
             "pending_bonus_tiles" => $state["pending_bonus_tiles"],
+            "pending_bonus_slots" => (int) $state["pending_bonus_slots"],
             "cells_this_turn" => $state["cells_this_turn"],
         ];
 
@@ -668,6 +709,9 @@ class Game extends \Bga\GameFramework\Table {
         $lastX = $snapshot["last_x"] === null ? "NULL" : "'" . $snapshot["last_x"] . "'";
         $lastY = $snapshot["last_y"] === null ? "NULL" : "'" . $snapshot["last_y"] . "'";
         $lastTileType = $snapshot["last_tile_type"] === null ? "NULL" : "'" . $snapshot["last_tile_type"] . "'";
+        $pendingSlots = array_key_exists("pending_bonus_slots", $snapshot)
+            ? (int) $snapshot["pending_bonus_slots"]
+            : count(json_decode($snapshot["pending_bonus_tiles"] ?? "[]", true) ?: []);
 
         static::DbQuery(
             "UPDATE `player_state` SET
@@ -701,6 +745,9 @@ class Game extends \Bga\GameFramework\Table {
             `pending_bonus_tiles` = '" .
                 $snapshot["pending_bonus_tiles"] .
                 "',
+            `pending_bonus_slots` = " .
+                $pendingSlots .
+                ",
             `cells_this_turn` = '" .
                 $snapshot["cells_this_turn"] .
                 "'
@@ -889,26 +936,10 @@ class Game extends \Bga\GameFramework\Table {
 
             // check for currywurst and e-scooter bonus tiles
             if (in_array($type, [CELL_CURRYWURST], true)) {
-                $tiles = $this->getPendingBonusTiles($playerId);
-                $tiles[] = "I2";
-
-                static::DbQuery(
-                    "UPDATE `player_state` SET `pending_bonus_tiles` = '" .
-                        json_encode($tiles) .
-                        "'
-                     WHERE `player_id` = '$playerId'"
-                );
+                $this->grantBonusTile($playerId, TILE_I2);
             }
             if (in_array($type, [CELL_ESCOOTER], true)) {
-                $tiles = $this->getPendingBonusTiles($playerId);
-                $tiles[] = "I4";
-
-                static::DbQuery(
-                    "UPDATE `player_state` SET `pending_bonus_tiles` = '" .
-                        json_encode($tiles) .
-                        "'
-                     WHERE `player_id` = '$playerId'"
-                );
+                $this->grantBonusTile($playerId, TILE_I4);
             }
         }
     }

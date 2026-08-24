@@ -56,6 +56,34 @@ export class PlaceTile {
     document.getElementById(`gfe-tiles-layer-${this.bga.players.getCurrentPlayerId()}`)?.querySelector("#gfe-preview-crosshair")?.remove();
   }
 
+  /**
+   * After refresh: resume street art, bonus, or End turn if this turn is already in progress.
+   */
+  private restoreInProgressTurn(isCurrentPlayerActive: boolean): boolean {
+    const ps = this.bga.gameui.gamedatas.playerState;
+    const pending = JSON.parse(String(ps.pending_bonus_tiles || "[]")) as string[];
+    const streetArtPending = Number(ps.street_art_pending);
+    const cells = JSON.parse(String(ps.cells_this_turn || "[]")) as unknown[];
+
+    this.pendingTiles = pending;
+
+    if (!isCurrentPlayerActive) return false;
+
+    if (streetArtPending > 0) {
+      this.showStreetArtChoose();
+      return true;
+    }
+    if (this.pendingTiles.length > 0) {
+      this.showBonusButtons(this.pendingTiles);
+      return true;
+    }
+    if (cells.length > 0) {
+      this.showConfirmEndTurn();
+      return true;
+    }
+    return false;
+  }
+
   private resetPlacementState() {
     this.tileSelected = null;
     this.anchorX = null;
@@ -185,23 +213,36 @@ export class PlaceTile {
     this.updateActionButtons(legal, grid);
   }
 
+  private selectTile(tile: string, grid: HTMLElement): void {
+    this.tileSelected = tile;
+    this.anchorX = 0;
+    this.anchorY = 0;
+    this.rotation = 0;
+    this.mirror = false;
+    this.showPreview(grid, tile, 0, 0);
+  }
+
   private updateActionButtons(legal: boolean, grid: HTMLElement) {
     this.bga.statusBar.removeActionButtons();
 
     if (!this.placeTileArgs) return;
 
-    const allTiles =
-      this.pendingTiles.length > 0 ? this.pendingTiles : [...this.placeTileArgs.tileOptions, ...this.placeTileArgs.alwaysAvailableTiles];
+    const mainTiles = this.pendingTiles.length > 0 ? this.pendingTiles : this.placeTileArgs.tileOptions;
 
-    allTiles.forEach((tile) => {
+    mainTiles.forEach((tile) => {
       this.bga.statusBar.addActionButton(tileButtonHtml(tile), () => {
-        this.tileSelected = tile;
-        this.anchorX = 0;
-        this.anchorY = 0;
-        this.rotation = 0;
-        this.mirror = false;
-        this.showPreview(grid, tile, 0, 0);
+        this.selectTile(tile, grid);
       });
+    });
+
+    this.placeTileArgs.alwaysAvailableTiles.forEach((tile) => {
+      this.bga.statusBar.addActionButton(
+        tileButtonHtml(tile),
+        () => {
+          this.selectTile(tile, grid);
+        },
+        { color: "secondary" }
+      );
     });
 
     this.bga.statusBar.addActionButton("↻", () => {
@@ -251,9 +292,13 @@ export class PlaceTile {
 
   private addUndoButtonIfPossible() {
     if (!this.canUndo) return;
-    this.bga.statusBar.addActionButton(_("Undo"), () => {
-      this.bga.actions.performAction("actUndo", {});
-    });
+    this.bga.statusBar.addActionButton(
+      _("Undo"),
+      () => {
+        this.bga.actions.performAction("actUndo", {});
+      },
+      { color: "alert" }
+    );
   }
 
   public showBonusButtons(pendingTiles: string[]) {
@@ -334,9 +379,7 @@ export class PlaceTile {
       streetArtGrid.removeEventListener("click", this.onStreetArtClick);
     }
 
-    this.bga.statusBar.setTitle(
-      this.canUndo ? _("${you}: undo, or end your turn") : _("${you} must end your turn")
-    );
+    this.bga.statusBar.setTitle(this.canUndo ? _("${you}: undo, or end your turn") : _("${you} must end your turn"));
     this.bga.statusBar.removeActionButtons();
     this.addUndoButtonIfPossible();
     this.bga.statusBar.addActionButton(_("End turn"), () => {
@@ -351,7 +394,6 @@ export class PlaceTile {
 
   onEnteringState(args: PlaceTileArgs, isCurrentPlayerActive: boolean) {
     this.placeTileArgs = args;
-    this.pendingTiles = [];
 
     // After refresh: only allow Undo if this turn already has changes
     if (!this.canUndo) {
@@ -373,6 +415,11 @@ export class PlaceTile {
 
     this.awaitingEndTurn = false;
 
+    if (this.restoreInProgressTurn(isCurrentPlayerActive)) {
+      return;
+    }
+
+    this.pendingTiles = [];
     this.bga.statusBar.setTitle(
       isCurrentPlayerActive ? _("${you} must place your tile on the map") : _("Other players are placing their tile...")
     );

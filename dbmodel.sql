@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS `player_state` (
     `street_art_score`      SMALLINT(2)      NOT NULL DEFAULT 0,
     `street_art_pending`    TINYINT(2)    NOT NULL DEFAULT 0,
     `pending_bonus_tiles`   VARCHAR(128)    NOT NULL DEFAULT '[]',
+    `pending_bonus_slots`   TINYINT(2)      NOT NULL DEFAULT 0,
     `mustsee_completed`     VARCHAR(64)     NOT NULL DEFAULT '[]',
     `mustsee_score`         SMALLINT(2)      NOT NULL DEFAULT 0,
     `monument_completed`    VARCHAR(64)     NOT NULL DEFAULT '[]',

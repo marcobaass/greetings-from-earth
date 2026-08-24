@@ -23,6 +23,7 @@ interface GreetingsFromEarthGamedatas extends Gamedatas<GreetingsFromEarthPlayer
     monument_score: number;
     monument_collection_score: number;
     pending_bonus_tiles: string;
+    pending_bonus_slots: number;
     mustsee_completed: string;
     mustsee_score: number;
     monument_completed: string;

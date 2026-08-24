@@ -275,6 +275,31 @@ class PlaceTile {
         });
         document.getElementById(`gfe-tiles-layer-${this.bga.players.getCurrentPlayerId()}`)?.querySelector("#gfe-preview-crosshair")?.remove();
     }
+    /**
+     * After refresh: resume street art, bonus, or End turn if this turn is already in progress.
+     */
+    restoreInProgressTurn(isCurrentPlayerActive) {
+        const ps = this.bga.gameui.gamedatas.playerState;
+        const pending = JSON.parse(String(ps.pending_bonus_tiles || "[]"));
+        const streetArtPending = Number(ps.street_art_pending);
+        const cells = JSON.parse(String(ps.cells_this_turn || "[]"));
+        this.pendingTiles = pending;
+        if (!isCurrentPlayerActive)
+            return false;
+        if (streetArtPending > 0) {
+            this.showStreetArtChoose();
+            return true;
+        }
+        if (this.pendingTiles.length > 0) {
+            this.showBonusButtons(this.pendingTiles);
+            return true;
+        }
+        if (cells.length > 0) {
+            this.showConfirmEndTurn();
+            return true;
+        }
+        return false;
+    }
     resetPlacementState() {
         this.tileSelected = null;
         this.anchorX = null;
@@ -379,20 +404,28 @@ class PlaceTile {
             return;
         this.updateActionButtons(legal, grid);
     }
+    selectTile(tile, grid) {
+        this.tileSelected = tile;
+        this.anchorX = 0;
+        this.anchorY = 0;
+        this.rotation = 0;
+        this.mirror = false;
+        this.showPreview(grid, tile, 0, 0);
+    }
     updateActionButtons(legal, grid) {
         this.bga.statusBar.removeActionButtons();
         if (!this.placeTileArgs)
             return;
-        const allTiles = this.pendingTiles.length > 0 ? this.pendingTiles : [...this.placeTileArgs.tileOptions, ...this.placeTileArgs.alwaysAvailableTiles];
-        allTiles.forEach((tile) => {
+        const mainTiles = this.pendingTiles.length > 0 ? this.pendingTiles : this.placeTileArgs.tileOptions;
+        mainTiles.forEach((tile) => {
             this.bga.statusBar.addActionButton(tileButtonHtml(tile), () => {
-                this.tileSelected = tile;
-                this.anchorX = 0;
-                this.anchorY = 0;
-                this.rotation = 0;
-                this.mirror = false;
-                this.showPreview(grid, tile, 0, 0);
+                this.selectTile(tile, grid);
             });
+        });
+        this.placeTileArgs.alwaysAvailableTiles.forEach((tile) => {
+            this.bga.statusBar.addActionButton(tileButtonHtml(tile), () => {
+                this.selectTile(tile, grid);
+            }, { color: "secondary" });
         });
         this.bga.statusBar.addActionButton("↻", () => {
             if (!this.tileSelected || this.anchorX == null || this.anchorY == null)
@@ -439,7 +472,7 @@ class PlaceTile {
             return;
         this.bga.statusBar.addActionButton(_("Undo"), () => {
             this.bga.actions.performAction("actUndo", {});
-        });
+        }, { color: "alert" });
     }
     showBonusButtons(pendingTiles) {
         this.pendingTiles = pendingTiles;
@@ -557,7 +590,6 @@ class PlaceTile {
     }
     onEnteringState(args, isCurrentPlayerActive) {
         this.placeTileArgs = args;
-        this.pendingTiles = [];
         // After refresh: only allow Undo if this turn already has changes
         if (!this.canUndo) {
             const ps = this.bga.gameui.gamedatas.playerState;
@@ -574,6 +606,10 @@ class PlaceTile {
             return;
         }
         this.awaitingEndTurn = false;
+        if (this.restoreInProgressTurn(isCurrentPlayerActive)) {
+            return;
+        }
+        this.pendingTiles = [];
         this.bga.statusBar.setTitle(isCurrentPlayerActive ? _("${you} must place your tile on the map") : _("Other players are placing their tile..."));
         if (isCurrentPlayerActive) {
             const playerId = this.bga.players.getCurrentPlayerId();
@@ -1012,6 +1048,9 @@ class Game {
         const myId = this.bga.players.getCurrentPlayerId();
         if (playerId !== myId)
             return;
+        const ps = this.bga.gameui.gamedatas.playerState;
+        ps.pending_bonus_tiles = JSON.stringify(pendingTiles);
+        ps.street_art_pending = streetArtPending;
         this.placeTile.setCanUndo(true);
         if (awaitingTurnConfirm) {
             this.placeTile.showConfirmEndTurn();

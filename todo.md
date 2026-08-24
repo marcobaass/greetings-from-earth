@@ -91,7 +91,8 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] End Scoring
 - [x] Circles for Roundtracker on other players board don't show on players board
 - [x] diffrent player sheet on top than actuall player
-- [ ] single and two square tiles also as alternative for bonus tiles
+- [x] diffrent color for alternative tiles
+- [x] single and two square tiles also as alternative for bonus tiles
 - [ ] layout shift through buttons top
 - [ ] prevent hover on street art track and board grid when no streetart to select or no tile for the board choosen
 
@@ -103,6 +104,7 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [ ] SVG scribbled circles on tracks and streetart
 - [ ] animations for circles
 - [ ] ring controls on board (Ark Nova style)
+- [ ] option when player can not make a move anymore (game end for specific player)
 - [?] Soundeffects
 - [ ] Hover Icons
 

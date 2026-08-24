@@ -344,6 +344,10 @@ export class Game {
     const myId = this.bga.players.getCurrentPlayerId();
     if (playerId !== myId) return;
 
+    const ps = this.bga.gameui.gamedatas.playerState;
+    ps.pending_bonus_tiles = JSON.stringify(pendingTiles);
+    ps.street_art_pending = streetArtPending;
+
     this.placeTile.setCanUndo(true);
 
     if (awaitingTurnConfirm) {

@@ -154,8 +154,7 @@ class PlaceTile extends GameState {
             throw new UserException(clienttranslate("End your turn or undo first"));
         }
 
-        $pendingTiles = $this->game->getPendingBonusTiles($currentPlayerId);
-        if (!in_array($tileType, $pendingTiles)) {
+        if (!$this->game->isValidBonusTileChoice($currentPlayerId, $tileType)) {
             throw new UserException("Invalid bonus tile choice");
         }
         $this->game->placeBonusTile($currentPlayerId, $tileType, $x, $y, $rotation, $mirror);
