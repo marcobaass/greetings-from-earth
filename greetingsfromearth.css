@@ -180,7 +180,6 @@
   width: 52%;
   height: 14%;
   pointer-events: none;
-  border: solid 2px red;
 }
 
 .gfe-collection-track-circle {
@@ -245,7 +244,6 @@
   width: 41%;
   height: 14%;
   pointer-events: none;
-  border: solid 2px blue;
 }
 
 .gfe-ufo-track-circle {
@@ -303,19 +301,17 @@
   left: 80.4%;
   width: 15%;
   height: 25.8%;
-  border: solid 2px green;
   transform: rotate(1.5deg);
 }
 
 .gfe-street-art-choose-cell {
   width: 100%;
   height: 100%;
-  border: 1px solid palevioletred;
-  background: rgba(255, 255, 0, 0.25);
+}
+.gfe-street-art-choose-interactive .gfe-street-art-choose-cell {
   cursor: pointer;
 }
-
-.gfe-street-art-choose-cell:hover {
+.gfe-street-art-choose-interactive .gfe-street-art-choose-cell:hover {
   background: rgba(255, 255, 0, 0.5);
 }
 
@@ -348,7 +344,6 @@
   left: 44%;
   width: 33%;
   height: 7%;
-  border: solid 2px yellow;
 }
 
 .gfe-round-tracker-circle {
@@ -370,7 +365,6 @@
   font-size: 28px;
   font-weight: bold;
   text-align: center;
-  border: 1px solid purple;
 }
 
 .gfe-track-score-gray {

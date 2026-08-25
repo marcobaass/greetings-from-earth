@@ -301,6 +301,7 @@ class PlaceTile {
         return false;
     }
     resetPlacementState() {
+        this.followingMouse = false;
         this.tileSelected = null;
         this.anchorX = null;
         this.anchorY = null;
@@ -315,6 +316,7 @@ class PlaceTile {
             this.cleanUpPreview(grid);
             grid.classList.remove("gfe-play-grid-interactive");
             grid.removeEventListener("click", this.onGridClick);
+            grid.removeEventListener("mousemove", this.onMouseMove);
         }
         if (streetArtGrid) {
             streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
@@ -405,11 +407,13 @@ class PlaceTile {
         this.updateActionButtons(legal, grid);
     }
     selectTile(tile, grid) {
+        this.followingMouse = true;
         this.tileSelected = tile;
         this.anchorX = 0;
         this.anchorY = 0;
         this.rotation = 0;
         this.mirror = false;
+        grid.classList.add("gfe-play-grid-interactive");
         this.showPreview(grid, tile, 0, 0);
     }
     updateActionButtons(legal, grid) {
@@ -489,8 +493,9 @@ class PlaceTile {
         this.cleanUpPreview(grid);
         // street art step removes the grid handler — put it back so bonus tiles can be positioned
         grid.removeEventListener("click", this.onGridClick);
-        grid.classList.add("gfe-play-grid-interactive");
+        grid.removeEventListener("mousemove", this.onMouseMove);
         grid.addEventListener("click", this.onGridClick);
+        grid.addEventListener("mousemove", this.onMouseMove);
         this.bga.statusBar.setTitle(_("${you} must place your bonus tile on the map"));
         this.updateActionButtons(false, grid);
     }
@@ -508,6 +513,7 @@ class PlaceTile {
             this.cleanUpPreview(grid);
             grid.classList.remove("gfe-play-grid-interactive");
             grid.removeEventListener("click", this.onGridClick);
+            grid.removeEventListener("mousemove", this.onMouseMove);
         }
         if (!streetArtGrid)
             return;
@@ -532,6 +538,7 @@ class PlaceTile {
             this.cleanUpPreview(grid);
             grid.classList.remove("gfe-play-grid-interactive");
             grid.removeEventListener("click", this.onGridClick);
+            grid.removeEventListener("mousemove", this.onMouseMove);
         }
         if (streetArtGrid) {
             streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
@@ -556,7 +563,9 @@ class PlaceTile {
         this.awaitingEndTurn = false;
         /** True only after a change this turn that can be reverted */
         this.canUndo = false;
+        this.followingMouse = false;
         this.onGridClick = (event) => {
+            this.followingMouse = false;
             const cell = event.target;
             if (!this.tileSelected)
                 return;
@@ -571,6 +580,26 @@ class PlaceTile {
             if (isNaN(this.anchorX) || isNaN(this.anchorY))
                 return;
             this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        };
+        this.onMouseMove = (event) => {
+            if (!this.followingMouse)
+                return;
+            if (!this.tileSelected)
+                return;
+            const cell = event.target;
+            if (!(cell instanceof HTMLElement) || !cell.classList.contains("gfe-cell"))
+                return;
+            const x = Number(cell.dataset.x);
+            const y = Number(cell.dataset.y);
+            if (isNaN(x) || isNaN(y))
+                return;
+            if (x === this.anchorX && y === this.anchorY)
+                return;
+            const playerId = this.bga.players.getCurrentPlayerId();
+            const grid = document.getElementById(`gfe-play-grid-${playerId}`);
+            if (!grid)
+                return;
+            this.showPreview(grid, this.tileSelected, x, y);
         };
         this.onStreetArtClick = (event) => {
             const cell = event.target;
@@ -617,8 +646,9 @@ class PlaceTile {
             if (!grid)
                 return;
             grid.removeEventListener("click", this.onGridClick);
-            grid.classList.add("gfe-play-grid-interactive");
+            grid.removeEventListener("mousemove", this.onMouseMove);
             grid.addEventListener("click", this.onGridClick);
+            grid.addEventListener("mousemove", this.onMouseMove);
             this.updateActionButtons(false, grid);
         }
     }

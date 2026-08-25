@@ -94,14 +94,14 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] diffrent color for alternative tiles
 - [x] single and two square tiles also as alternative for bonus tiles
 - [x] layout shift through buttons top
-- [ ] prevent hover on street art track and board grid when no streetart to select or no tile for the board choosen
+- [x] prevent hover on street art track and board grid when no streetart to select or no tile for the board choosen
 
 ## Later — placement UX
 
 - [?] Valid-placement hint: highlight where a tile may legally touch (S-Bahn on first turn; last tile + S-Bahn later)
-- [ ] tile on mouse first?
+- [x] tile on mouse first?
 - [x] SVG preview overlay (replace or layer on CSS cells)
-- [ ] SVG scribbled circles on tracks and streetart
+- [ ] SVG scribbled circles on tracks and streetart / circles off after removing borders
 - [ ] animations for circles
 - [ ] ring controls on board (Ark Nova style)
 - [ ] option when player can not make a move anymore (game end for specific player)
