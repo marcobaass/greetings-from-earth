@@ -22,6 +22,19 @@ export class Game {
   }
 
   // ===== RENDERING =====
+  private renderScribbleCircle(animate = false): string {
+    return `<svg viewBox="0 0 500 500">
+            <path
+              class="gfe-scribble-circle ${animate ? "gfe-circle-draw" : ""}"              
+              fill="none"
+              stroke="black"
+              stroke-width="50"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M 27.189 195.683 C 30.061 131.618 94.099 84.3 117.657 68.019 C 140.551 52.197 213.962 25.065 280.326 36.589 C 395.932 56.664 426.688 110.248 442.969 138.089 C 490.779 219.846 479.422 338.99 437.633 396.353 C 370.052 489.119 283.113 479.008 177.507 461.765 C 134.745 454.134 75.723 435.929 52.6 350.834 C 42.992 317.513 51.203 254.43 68.837 228.121"
+            />
+          </svg>`;
+  }
 
   private renderRoundTracker(playerId: number, round: number) {
     const roundTracker = document.getElementById(`gfe-round-tracker-${playerId}`);
@@ -86,7 +99,7 @@ export class Game {
     track.innerHTML += `<div class="gfe-monument-score"><p class="gfe-track-score">${monumentScoreString}</p></div>`;
 
     for (let i = 0; i < collectionCount; i++) {
-      track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.515}%; left: ${11.2 + i * 7.8}%"></div>`;
+      track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.515}%; left: ${11.2 + i * 7.8}%">${this.renderScribbleCircle(i === collectionCount - 1)}</div>`;
     }
 
     track.innerHTML += `<div class="gfe-collection-score"><p class="gfe-track-score">${collectionScoreString}</p></div>`;

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <filter id="morphology-filter-0" bx:preset="morphology 1 erode 2" color-interpolation-filters="sRGB" x="-50%" y="-50%" width="200%" height="200%">
+      <feMorphology operator="erode" radius="2"></feMorphology>
+    </filter>
+    <filter id="round-edges-filter-0" color-interpolation-filters="sRGB" x="-50%" y="-50%" width="200%" height="200%">
+      <title>Runde Kanten</title>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3.4 3.4"></feGaussianBlur>
+      <feColorMatrix mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 200 -100"></feColorMatrix>
+      <feComposite in="SourceGraphic" operator="atop"></feComposite>
+    </filter>
+  </defs>
+  <path style="fill: none; stroke: rgb(0, 0, 0); fill-rule: nonzero; paint-order: fill; filter: url(#morphology-filter-0) url(#round-edges-filter-0); stroke-linecap: round; stroke-linejoin: round; transform-box: fill-box; transform-origin: 50% 50%; stroke-width: 50px;" d="M 27.189 195.683 C 30.061 131.618 94.099 84.3 117.657 68.019 C 140.551 52.197 213.962 25.065 280.326 36.589 C 395.932 56.664 426.688 110.248 442.969 138.089 C 490.779 219.846 479.422 338.99 437.633 396.353 C 370.052 489.119 283.113 479.008 177.507 461.765 C 134.745 454.134 75.723 435.929 52.6 350.834 C 42.992 317.513 51.203 254.43 68.837 228.121"></path>
+</svg>
