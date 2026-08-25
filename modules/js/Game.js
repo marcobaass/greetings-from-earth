@@ -837,6 +837,8 @@ class PlaceBonus {
 
 class Game {
     constructor(bga) {
+        /** Last known scribble counts — animate only when a count increases */
+        this.scribbleCounts = new Map();
         console.log("greetingsfromearth constructor");
         this.bga = bga;
         // Register state classes — names must match PHP state class names
@@ -859,6 +861,12 @@ class Game {
             />
           </svg>`;
     }
+    /** True only when this track already had a known count and it went up (skips first paint / same-count redraws). */
+    shouldAnimateScribble(key, count) {
+        const prev = this.scribbleCounts.get(key);
+        this.scribbleCounts.set(key, count);
+        return prev !== undefined && count > prev;
+    }
     renderRoundTracker(playerId, round) {
         const roundTracker = document.getElementById(`gfe-round-tracker-${playerId}`);
         if (!roundTracker || round === 0)
@@ -879,9 +887,10 @@ class Game {
             { top: 14.5, left: 85.6 },
             { top: 26.9, left: 91.9 }
         ];
+        const animateLast = this.shouldAnimateScribble(`${playerId}-round`, round);
         roundTracker.innerHTML = "";
         for (let i = 0; i < round; i++) {
-            roundTracker.innerHTML += `<div class="gfe-round-tracker-circle" style="top: ${ROUNDS_POSITIONS[i].top}%; left: ${ROUNDS_POSITIONS[i].left}%"></div>`;
+            roundTracker.innerHTML += `<div class="gfe-round-tracker-circle" style="top: ${ROUNDS_POSITIONS[i].top}%; left: ${ROUNDS_POSITIONS[i].left}%">${this.renderScribbleCircle(animateLast && i === round - 1)}</div>`;
         }
     }
     renderCoveredCells(playerId, coveredCells) {
@@ -900,13 +909,15 @@ class Game {
         const monumentScoreString = monumentScore.toString();
         const collectionScoreString = collectionScore.toString();
         const monumentCollectionScoreString = monumentCollectionScore.toString();
+        const animateMonument = this.shouldAnimateScribble(`${playerId}-monument`, monumentCount);
+        const animateCollection = this.shouldAnimateScribble(`${playerId}-collection`, collectionCount);
         track.innerHTML = "";
         for (let i = 0; i < monumentCount; i++) {
-            track.innerHTML += `<div class="gfe-monument-track-circle" data-index="${i}" style="top: ${17.4 + i * 0.56}%; left: ${11.3 + i * 10.86}%"></div>`;
+            track.innerHTML += `<div class="gfe-monument-track-circle" data-index="${i}" style="top: ${17.4 + i * 0.56}%; left: ${11.3 + i * 10.86}%">${this.renderScribbleCircle(animateMonument && i === monumentCount - 1)}</div>`;
         }
         track.innerHTML += `<div class="gfe-monument-score"><p class="gfe-track-score">${monumentScoreString}</p></div>`;
         for (let i = 0; i < collectionCount; i++) {
-            track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.515}%; left: ${11.2 + i * 7.8}%">${this.renderScribbleCircle(i === collectionCount - 1)}</div>`;
+            track.innerHTML += `<div class="gfe-collection-track-circle" data-index="${i}" style="top: ${55 + i * 0.515}%; left: ${11.2 + i * 7.8}%">${this.renderScribbleCircle(animateCollection && i === collectionCount - 1)}</div>`;
         }
         track.innerHTML += `<div class="gfe-collection-score"><p class="gfe-track-score">${collectionScoreString}</p></div>`;
         track.innerHTML += `<div class="gfe-monument-collection-score"><p class="gfe-track-score">${monumentCollectionScoreString}</p></div>`;
@@ -919,16 +930,18 @@ class Game {
         const ufoScoreString = ufoScore.toString();
         const monumentCollectionScoreString = monumentCollectionScore.toString();
         const streetArtScoreString = streetArtScore.toString();
+        const animateMustsee = this.shouldAnimateScribble(`${playerId}-mustsee`, mustseeCount);
+        const animateUfo = this.shouldAnimateScribble(`${playerId}-ufo`, ufoCount);
         track.innerHTML = "";
         for (let i = 0; i < mustseeCount; i++) {
             const pair = Math.floor(i / 2);
             const top = i % 2 === 0 ? 11.9 + pair * -1.7 : 29.2 + pair * -0.35;
             const left = (i % 2 === 0 ? 14.5 : 19.7) + pair * 10.2;
-            track.innerHTML += `<div class="gfe-mustsee-track-circle" data-index="${i}" style="top: ${top}%; left: ${left}%"></div>`;
+            track.innerHTML += `<div class="gfe-mustsee-track-circle" data-index="${i}" style="top: ${top}%; left: ${left}%">${this.renderScribbleCircle(animateMustsee && i === mustseeCount - 1)}</div>`;
         }
         track.innerHTML += `<div class="gfe-mustsee-score"><p class="gfe-track-score-orange">${mustseeScoreString}</p></div>`;
         for (let i = 0; i < ufoCount; i++) {
-            track.innerHTML += `<div class="gfe-ufo-track-circle" data-index="${i}" style="top: ${59 + i * -0.315}%; left: ${15.2 + i * 9.8}%"></div>`;
+            track.innerHTML += `<div class="gfe-ufo-track-circle" data-index="${i}" style="top: ${59 + i * -0.315}%; left: ${15.2 + i * 9.8}%">${this.renderScribbleCircle(animateUfo && i === ufoCount - 1)}</div>`;
         }
         track.innerHTML += `<div class="gfe-ufo-score"><p class="gfe-track-score-orange">${ufoScoreString}</p></div>`;
         track.innerHTML += `<div class="gfe-total-score"><p class="gfe-track-score-gray">${Number(ufoScoreString) + Number(mustseeScoreString) + Number(monumentCollectionScoreString) + Number(streetArtScoreString)}</p></div>`;
@@ -939,15 +952,22 @@ class Game {
         if (!streetArtGridEl)
             return;
         const streetArtScoreString = streetArtScore.toString();
-        for (const cell of completedKeys) {
+        const animateLast = this.shouldAnimateScribble(`${playerId}-streetart`, completedKeys.length);
+        // Clear previous marks (needed for undo / full rebuild)
+        streetArtGridEl.querySelectorAll(".gfe-street-art-choose-cell").forEach((cell) => {
+            cell.classList.remove("gfe-street-art-marked");
+            cell.querySelector("svg")?.remove();
+        });
+        completedKeys.forEach((cell, index) => {
             const [x, y] = cell.split(",");
             if (isNaN(Number(x)) || isNaN(Number(y)))
-                continue;
+                return;
             const cellEl = streetArtGridEl.querySelector(`.gfe-street-art-choose-cell[data-x="${Number(x)}"][data-y="${Number(y)}"]`);
-            if (cellEl) {
-                cellEl.classList.add("gfe-street-art-marked");
-            }
-        }
+            if (!cellEl)
+                return;
+            cellEl.classList.add("gfe-street-art-marked");
+            cellEl.insertAdjacentHTML("beforeend", this.renderScribbleCircle(animateLast && index === completedKeys.length - 1));
+        });
         if (streetArtScoreEl) {
             streetArtScoreEl.innerHTML = `<p class="gfe-track-score-blue">${streetArtScoreString}</p>`;
         }
@@ -1110,78 +1130,15 @@ class Game {
         this.placeTile.showConfirmEndTurn();
     }
     // ===== NOTIFICATIONS =====
-    async notif_tilePlaced(args) {
-        document
-            .getElementById(`gfe-tiles-layer-${args.player_id}`)
-            ?.querySelectorAll(".gfe-tile-last")
-            .forEach((el) => el.classList.remove("gfe-tile-last"));
-        this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror, true);
-        const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
-        // this.renderCoveredCells(
-        //   args.player_id,
-        //   cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type }))
-        // );
-        const myId = this.bga.players.getCurrentPlayerId();
-        if (args.player_id === myId) {
-            const gamedatas = this.bga.gameui.gamedatas;
-            cells.forEach(([x, y]) => {
-                gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
-            });
-            gamedatas.playerState.has_started = 1;
-            gamedatas.playerState.last_x = args.x;
-            gamedatas.playerState.last_y = args.y;
-            gamedatas.playerState.last_tile_type = args.tile_type;
-            gamedatas.playerState.last_rotation = args.rotation;
-            gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
-        }
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
-    }
-    async notif_bonusTilePlaced(args) {
-        document
-            .getElementById(`gfe-tiles-layer-${args.player_id}`)
-            ?.querySelectorAll(".gfe-tile-last")
-            .forEach((el) => el.classList.remove("gfe-tile-last"));
-        this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror, true);
-        const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
-        // this.renderCoveredCells(
-        //   args.player_id,
-        //   cells.map(([x, y]) => ({ x, y, tile_type: args.tile_type }))
-        // );
-        const myId = this.bga.players.getCurrentPlayerId();
-        if (args.player_id === myId) {
-            const gamedatas = this.bga.gameui.gamedatas;
-            cells.forEach(([x, y]) => {
-                gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
-            });
-            gamedatas.playerState.has_started = 1;
-            gamedatas.playerState.last_x = args.x;
-            gamedatas.playerState.last_y = args.y;
-            gamedatas.playerState.last_tile_type = args.tile_type;
-            gamedatas.playerState.last_rotation = args.rotation;
-            gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
-        }
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
-    }
-    async notif_streetArtChosen(args) {
-        const ps = this.bga.gameui.gamedatas.playerState;
-        const mustsee = JSON.parse(String(ps.mustsee_completed || "[]"));
-        if (args.player_id === this.bga.players.getCurrentPlayerId()) {
-            this.bga.gameui.gamedatas.playerState.street_art_score = args.street_art_score;
-            this.renderMustSeeUfoTrack(args.player_id, ps.ufo_count, mustsee.length, ps.mustsee_score, ps.ufo_score, ps.monument_collection_score, ps.street_art_score);
-        }
-        this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
-    }
-    async notif_turnFinalized(args) {
+    applyBoardScoringFromNotif(args) {
         const monument = Array.isArray(args.monument_completed)
             ? args.monument_completed
             : JSON.parse(String(args.monument_completed || "[]"));
-        this.renderMonumentCollectionTrack(args.player_id, monument.length, args.collection_count, args.monument_score, args.collection_score, args.monument_collection_score);
         const mustsee = Array.isArray(args.mustsee_completed)
             ? args.mustsee_completed
             : JSON.parse(String(args.mustsee_completed || "[]"));
+        this.renderMonumentCollectionTrack(args.player_id, monument.length, args.collection_count, args.monument_score, args.collection_score, args.monument_collection_score);
         this.renderMustSeeUfoTrack(args.player_id, args.ufo_count, mustsee.length, args.mustsee_score, args.ufo_score, args.monument_collection_score, args.street_art_score);
-        // Only sync local gamedatas for yourself
         if (args.player_id === this.bga.players.getCurrentPlayerId()) {
             const ps = this.bga.gameui.gamedatas.playerState;
             ps.collection_count = args.collection_count;
@@ -1195,6 +1152,65 @@ class Game {
             ps.monument_collection_score = args.monument_collection_score;
             ps.street_art_score = args.street_art_score;
         }
+    }
+    async notif_tilePlaced(args) {
+        document
+            .getElementById(`gfe-tiles-layer-${args.player_id}`)
+            ?.querySelectorAll(".gfe-tile-last")
+            .forEach((el) => el.classList.remove("gfe-tile-last"));
+        this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror, true);
+        const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
+        const myId = this.bga.players.getCurrentPlayerId();
+        if (args.player_id === myId) {
+            const gamedatas = this.bga.gameui.gamedatas;
+            cells.forEach(([x, y]) => {
+                gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+            });
+            gamedatas.playerState.has_started = 1;
+            gamedatas.playerState.last_x = args.x;
+            gamedatas.playerState.last_y = args.y;
+            gamedatas.playerState.last_tile_type = args.tile_type;
+            gamedatas.playerState.last_rotation = args.rotation;
+            gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
+        }
+        this.applyBoardScoringFromNotif(args);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
+    }
+    async notif_bonusTilePlaced(args) {
+        document
+            .getElementById(`gfe-tiles-layer-${args.player_id}`)
+            ?.querySelectorAll(".gfe-tile-last")
+            .forEach((el) => el.classList.remove("gfe-tile-last"));
+        this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror, true);
+        const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
+        const myId = this.bga.players.getCurrentPlayerId();
+        if (args.player_id === myId) {
+            const gamedatas = this.bga.gameui.gamedatas;
+            cells.forEach(([x, y]) => {
+                gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+            });
+            gamedatas.playerState.has_started = 1;
+            gamedatas.playerState.last_x = args.x;
+            gamedatas.playerState.last_y = args.y;
+            gamedatas.playerState.last_tile_type = args.tile_type;
+            gamedatas.playerState.last_rotation = args.rotation;
+            gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
+        }
+        this.applyBoardScoringFromNotif(args);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
+    }
+    async notif_streetArtChosen(args) {
+        const ps = this.bga.gameui.gamedatas.playerState;
+        const mustsee = JSON.parse(String(ps.mustsee_completed || "[]"));
+        if (args.player_id === this.bga.players.getCurrentPlayerId()) {
+            this.bga.gameui.gamedatas.playerState.street_art_score = args.street_art_score;
+            this.renderMustSeeUfoTrack(args.player_id, ps.ufo_count, mustsee.length, ps.mustsee_score, ps.ufo_score, ps.monument_collection_score, ps.street_art_score);
+        }
+        this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
+    }
+    async notif_turnFinalized(args) {
+        this.applyBoardScoringFromNotif(args);
     }
     async notif_turnUndone(args) {
         const playerId = args.player_id;
@@ -1220,10 +1236,15 @@ class Game {
                 Number(p.mirror) === Number(ps.last_mirror);
             this.drawTileOnSVG(playerId, p.tile_type, Number(p.x), Number(p.y), Number(p.rotation), Number(p.mirror) === 1, isLast);
         }
-        // 4. if this is MY undo, reset UI back to “place a tile”
+        // 4. restore track UI for this player (scores already restored on server)
+        const monument = JSON.parse(String(ps.monument_completed || "[]"));
+        const mustsee = JSON.parse(String(ps.mustsee_completed || "[]"));
+        const streetArt = JSON.parse(String(ps.street_art_completed || "[]"));
+        this.renderMonumentCollectionTrack(playerId, monument.length, Number(ps.collection_count), Number(ps.monument_score), Number(ps.collection_score), Number(ps.monument_collection_score));
+        this.renderMustSeeUfoTrack(playerId, Number(ps.ufo_count), mustsee.length, Number(ps.mustsee_score), Number(ps.ufo_score), Number(ps.monument_collection_score), Number(ps.street_art_score));
+        this.renderStreetArtTrack(playerId, streetArt, Number(ps.street_art_score));
+        // 5. if this is MY undo, reset UI back to “place a tile”
         if (playerId === myId) {
-            const streetArt = JSON.parse(String(ps.street_art_completed || "[]"));
-            this.renderStreetArtTrack(myId, streetArt, Number(ps.street_art_score));
             this.placeTile.resetAfterUndo();
         }
     }

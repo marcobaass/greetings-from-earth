@@ -57,6 +57,16 @@ interface NotifTilePlacedArgs {
   pending_tiles?: string[];
   street_art_pending?: number;
   awaiting_turn_confirm?: boolean;
+  collection_count: number;
+  collection_score: number;
+  ufo_count: number;
+  ufo_score: number;
+  mustsee_completed: string[];
+  mustsee_score: number;
+  monument_completed: string[];
+  monument_score: number;
+  monument_collection_score: number;
+  street_art_score: number;
 }
 
 interface NotifNewRoundArgs {

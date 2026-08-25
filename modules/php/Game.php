@@ -233,6 +233,7 @@ class Game extends \Bga\GameFramework\Table {
 
         $this->checkBonusTilesFromCells($playerId, $cellKeys);
         $this->checkStreetArt($playerId, $cellKeys);
+        $this->applyPlacementBoardScoring($playerId, $cellKeys);
     }
 
     public function placeBonusTile(int $playerId, string $tileType, int $x, int $y, int $rotation, bool $mirror): void {
@@ -285,6 +286,7 @@ class Game extends \Bga\GameFramework\Table {
 
         $this->checkBonusTilesFromCells($playerId, $cellKeys);
         $this->checkStreetArt($playerId, $cellKeys);
+        $this->applyPlacementBoardScoring($playerId, $cellKeys);
     }
 
     // ===== STREETART =====
@@ -669,10 +671,16 @@ class Game extends \Bga\GameFramework\Table {
             `last_x`, `last_y`, `last_tile_type`, `last_rotation`, `last_mirror`,
             `has_started`, `currywurst_count`, `escooter_count`,
             `street_art_completed`, `street_art_score`, `street_art_pending`,
-            `pending_bonus_tiles`, `pending_bonus_slots`, `cells_this_turn`
+            `pending_bonus_tiles`, `pending_bonus_slots`, `cells_this_turn`,
+            `collection_count`, `collection_score`,
+            `monument_completed`, `monument_score`, `monument_collection_score`,
+            `ufo_count`, `ufo_score`,
+            `mustsee_completed`, `mustsee_score`
             FROM `player_state`
             WHERE `player_id` = '$playerId'"
         );
+
+        $playerScore = (int) $this->getUniqueValueFromDB("SELECT `player_score` FROM `player` WHERE `player_id` = '$playerId'");
 
         $snapshot = [
             "max_placement_id" => $maxPlacementId,
@@ -690,6 +698,16 @@ class Game extends \Bga\GameFramework\Table {
             "pending_bonus_tiles" => $state["pending_bonus_tiles"],
             "pending_bonus_slots" => (int) $state["pending_bonus_slots"],
             "cells_this_turn" => $state["cells_this_turn"],
+            "collection_count" => (int) $state["collection_count"],
+            "collection_score" => (int) $state["collection_score"],
+            "monument_completed" => $state["monument_completed"],
+            "monument_score" => (int) $state["monument_score"],
+            "monument_collection_score" => (int) $state["monument_collection_score"],
+            "ufo_count" => (int) $state["ufo_count"],
+            "ufo_score" => (int) $state["ufo_score"],
+            "mustsee_completed" => $state["mustsee_completed"],
+            "mustsee_score" => (int) $state["mustsee_score"],
+            "player_score" => $playerScore,
         ];
 
         $json = static::escapeStringForDB(json_encode($snapshot));
@@ -713,6 +731,12 @@ class Game extends \Bga\GameFramework\Table {
             ? (int) $snapshot["pending_bonus_slots"]
             : count(json_decode($snapshot["pending_bonus_tiles"] ?? "[]", true) ?: []);
 
+        $monumentCompleted = static::escapeStringForDB($snapshot["monument_completed"] ?? "[]");
+        $mustseeCompleted = static::escapeStringForDB($snapshot["mustsee_completed"] ?? "[]");
+        $streetArtCompleted = static::escapeStringForDB($snapshot["street_art_completed"] ?? "[]");
+        $pendingBonusTiles = static::escapeStringForDB($snapshot["pending_bonus_tiles"] ?? "[]");
+        $cellsThisTurn = static::escapeStringForDB($snapshot["cells_this_turn"] ?? "[]");
+
         static::DbQuery(
             "UPDATE `player_state` SET
             `last_x` = $lastX,
@@ -733,26 +757,47 @@ class Game extends \Bga\GameFramework\Table {
             `escooter_count` = " .
                 (int) $snapshot["escooter_count"] .
                 ",
-            `street_art_completed` = '" .
-                $snapshot["street_art_completed"] .
-                "',
+            `street_art_completed` = '$streetArtCompleted',
             `street_art_score` = " .
                 (int) $snapshot["street_art_score"] .
                 ",
             `street_art_pending` = " .
                 (int) $snapshot["street_art_pending"] .
                 ",
-            `pending_bonus_tiles` = '" .
-                $snapshot["pending_bonus_tiles"] .
-                "',
+            `pending_bonus_tiles` = '$pendingBonusTiles',
             `pending_bonus_slots` = " .
                 $pendingSlots .
                 ",
-            `cells_this_turn` = '" .
-                $snapshot["cells_this_turn"] .
-                "'
+            `cells_this_turn` = '$cellsThisTurn',
+            `collection_count` = " .
+                (int) ($snapshot["collection_count"] ?? 0) .
+                ",
+            `collection_score` = " .
+                (int) ($snapshot["collection_score"] ?? 0) .
+                ",
+            `monument_completed` = '$monumentCompleted',
+            `monument_score` = " .
+                (int) ($snapshot["monument_score"] ?? 0) .
+                ",
+            `monument_collection_score` = " .
+                (int) ($snapshot["monument_collection_score"] ?? 0) .
+                ",
+            `ufo_count` = " .
+                (int) ($snapshot["ufo_count"] ?? 0) .
+                ",
+            `ufo_score` = " .
+                (int) ($snapshot["ufo_score"] ?? 0) .
+                ",
+            `mustsee_completed` = '$mustseeCompleted',
+            `mustsee_score` = " .
+                (int) ($snapshot["mustsee_score"] ?? 0) .
+                "
          WHERE `player_id` = '$playerId'"
         );
+
+        if (array_key_exists("player_score", $snapshot)) {
+            $this->playerScore->set($playerId, (int) $snapshot["player_score"]);
+        }
 
         $placements = $this->getObjectListFromDB(
             "SELECT `placement_id`, `tile_type`, `x`, `y`, `rotation`, `mirror`
@@ -783,37 +828,56 @@ class Game extends \Bga\GameFramework\Table {
     // ===== FINALIZE TURN =====
     // This is called when a player ends their turn
     public function finalizeTurn(int $playerId): void {
-        $cellKeys = $this->getCellsThisTurn($playerId);
+        // Board scoring already ran on each placement; only clear turn cells and sync UI.
+        $this->clearCellsThisTurn($playerId);
+
+        $scoring = $this->getBoardScoringNotifArgs($playerId);
+
+        // notify all players
+        $this->notify->all(
+            "turnFinalized",
+            clienttranslate('${player_name} ends their turn'),
+            array_merge(
+                [
+                    "player_id" => $playerId,
+                    "player_name" => $this->getPlayerNameById($playerId),
+                ],
+                $scoring
+            )
+        );
+    }
+
+    /**
+     * Score collection / monument / UFO / must-see for newly placed cells.
+     * Safe to call mid-turn; must not be called again for the same cells.
+     */
+    public function applyPlacementBoardScoring(int $playerId, array $cellKeys): array {
         $this->checkMonumentSurround($playerId);
         $this->checkCollectibles($playerId, $cellKeys);
         $this->checkUFOs($playerId, $cellKeys);
         $this->checkMustSeeClusters($playerId);
-        $this->clearCellsThisTurn($playerId);
+        return $this->getBoardScoringNotifArgs($playerId);
+    }
 
-        // get collection and UFO counts
+    public function getBoardScoringNotifArgs(int $playerId): array {
         $state = $this->getObjectFromDb(
-            "SELECT collection_count, collection_score, ufo_count, ufo_score, mustsee_completed, mustsee_score, monument_completed, monument_score, monument_collection_score, street_art_score FROM player_state WHERE player_id = '$playerId'"
+            "SELECT collection_count, collection_score, ufo_count, ufo_score, mustsee_completed, mustsee_score,
+                    monument_completed, monument_score, monument_collection_score, street_art_score
+             FROM player_state WHERE player_id = '$playerId'"
         );
-        $collectionCount = (int) $state["collection_count"];
-        $ufoCount = (int) $state["ufo_count"];
-        $mustseeCompleted = json_decode($state["mustsee_completed"] ?? "[]", true);
-        $monumentCompleted = json_decode($state["monument_completed"] ?? "[]", true);
 
-        // notify all players
-        $this->notify->all("turnFinalized", clienttranslate('${player_name} ends their turn'), [
-            "player_id" => $playerId,
-            "player_name" => $this->getPlayerNameById($playerId),
+        return [
             "collection_count" => (int) $state["collection_count"],
             "collection_score" => (int) $state["collection_score"],
             "ufo_count" => (int) $state["ufo_count"],
             "ufo_score" => (int) $state["ufo_score"],
-            "mustsee_completed" => json_decode($state["mustsee_completed"] ?? "[]", true),
+            "mustsee_completed" => json_decode($state["mustsee_completed"] ?? "[]", true) ?? [],
             "mustsee_score" => (int) $state["mustsee_score"],
-            "monument_completed" => json_decode($state["monument_completed"] ?? "[]", true),
+            "monument_completed" => json_decode($state["monument_completed"] ?? "[]", true) ?? [],
             "monument_score" => (int) $state["monument_score"],
             "monument_collection_score" => (int) $state["monument_collection_score"],
             "street_art_score" => (int) $state["street_art_score"],
-        ]);
+        ];
     }
 
     // ===== CHECK MONUMENT SURROUND =====

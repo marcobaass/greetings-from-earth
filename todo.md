@@ -101,9 +101,9 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [?] Valid-placement hint: highlight where a tile may legally touch (S-Bahn on first turn; last tile + S-Bahn later)
 - [x] tile on mouse first?
 - [x] SVG preview overlay (replace or layer on CSS cells)
-- [ ] SVG scribbled circles on tracks and streetart / circles off after removing borders
-- [ ] animations for circles
-- [ ] undo does not remove green squares on streetart track
+- [x] SVG scribbled circles on tracks and streetart / circles off after removing borders
+- [x] animations for circles
+- [x] undo does not remove green squares on streetart track
 - [ ] ring controls on board (Ark Nova style)
 - [ ] option when player can not make a move anymore (game end for specific player)
 - [?] Soundeffects

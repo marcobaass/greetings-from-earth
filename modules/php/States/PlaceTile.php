@@ -53,20 +53,28 @@ class PlaceTile extends GameState {
 
         $this->game->placeTile($currentPlayerId, $tileType, $x, $y, $rotation, $mirror);
         $status = $this->game->afterPlacementStatus($currentPlayerId);
+        $scoring = $this->game->getBoardScoringNotifArgs($currentPlayerId);
 
-        $this->notify->all("tilePlaced", clienttranslate('${player_name} places a ${tile_type} tile'), [
-            "player_id" => $currentPlayerId,
-            "player_name" => $this->game->getPlayerNameById($currentPlayerId),
-            "tile_type" => $tileType,
-            "x" => $x,
-            "y" => $y,
-            "rotation" => $rotation,
-            "mirror" => $mirror,
-            "pending_tiles" => $status["pending_tiles"],
-            "street_art_pending" => $status["street_art_pending"],
-            "street_art_completed" => $status["street_art_completed"],
-            "awaiting_turn_confirm" => $status["awaiting_turn_confirm"],
-        ]);
+        $this->notify->all(
+            "tilePlaced",
+            clienttranslate('${player_name} places a ${tile_type} tile'),
+            array_merge(
+                [
+                    "player_id" => $currentPlayerId,
+                    "player_name" => $this->game->getPlayerNameById($currentPlayerId),
+                    "tile_type" => $tileType,
+                    "x" => $x,
+                    "y" => $y,
+                    "rotation" => $rotation,
+                    "mirror" => $mirror,
+                    "pending_tiles" => $status["pending_tiles"],
+                    "street_art_pending" => $status["street_art_pending"],
+                    "street_art_completed" => $status["street_art_completed"],
+                    "awaiting_turn_confirm" => $status["awaiting_turn_confirm"],
+                ],
+                $scoring
+            )
+        );
 
         // Stay active until End turn — re-assert multiactive list
         $this->game->keepPlayersInRoundActive(NewRound::class);
@@ -159,20 +167,28 @@ class PlaceTile extends GameState {
         }
         $this->game->placeBonusTile($currentPlayerId, $tileType, $x, $y, $rotation, $mirror);
         $status = $this->game->afterPlacementStatus($currentPlayerId);
+        $scoring = $this->game->getBoardScoringNotifArgs($currentPlayerId);
 
-        $this->notify->all("bonusTilePlaced", clienttranslate('${player_name} places a bonus ${tile_type} tile'), [
-            "player_id" => $currentPlayerId,
-            "player_name" => $this->game->getPlayerNameById($currentPlayerId),
-            "tile_type" => $tileType,
-            "x" => $x,
-            "y" => $y,
-            "rotation" => $rotation,
-            "mirror" => $mirror,
-            "pending_tiles" => $status["pending_tiles"],
-            "street_art_pending" => $status["street_art_pending"],
-            "street_art_completed" => $status["street_art_completed"],
-            "awaiting_turn_confirm" => $status["awaiting_turn_confirm"],
-        ]);
+        $this->notify->all(
+            "bonusTilePlaced",
+            clienttranslate('${player_name} places a bonus ${tile_type} tile'),
+            array_merge(
+                [
+                    "player_id" => $currentPlayerId,
+                    "player_name" => $this->game->getPlayerNameById($currentPlayerId),
+                    "tile_type" => $tileType,
+                    "x" => $x,
+                    "y" => $y,
+                    "rotation" => $rotation,
+                    "mirror" => $mirror,
+                    "pending_tiles" => $status["pending_tiles"],
+                    "street_art_pending" => $status["street_art_pending"],
+                    "street_art_completed" => $status["street_art_completed"],
+                    "awaiting_turn_confirm" => $status["awaiting_turn_confirm"],
+                ],
+                $scoring
+            )
+        );
 
         $this->game->keepPlayersInRoundActive(NewRound::class);
         return null;

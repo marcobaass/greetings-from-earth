@@ -187,12 +187,6 @@
   width: 3.9%;
   height: 19.7%;
 }
-.gfe-collection-track-circle svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-  overflow: visible;
-}
 
 .gfe-collection-score {
   position: absolute;
@@ -207,9 +201,6 @@
   position: absolute;
   width: 3.9%;
   height: 19.7%;
-  border-radius: 50%;
-  background: rgba(255, 255, 0, 0.25);
-  border: 4px solid black;
 }
 
 .gfe-monument-score {
@@ -253,9 +244,6 @@
   position: absolute;
   width: 4.9%;
   height: 19.7%;
-  border-radius: 50%;
-  background: rgba(255, 255, 0, 0.25);
-  border: 4px solid black;
 }
 
 .gfe-ufo-score {
@@ -271,9 +259,6 @@
   position: absolute;
   width: 3.4%;
   height: 14.5%;
-  border-radius: 50%;
-  background: rgba(255, 255, 0, 0.25);
-  border: 4px solid black;
 }
 
 .gfe-mustsee-score {
@@ -310,6 +295,7 @@
 .gfe-street-art-choose-cell {
   width: 100%;
   height: 100%;
+  position: relative;
 }
 .gfe-street-art-choose-interactive .gfe-street-art-choose-cell {
   cursor: pointer;
@@ -318,8 +304,12 @@
   background: rgba(255, 255, 0, 0.5);
 }
 
-.gfe-street-art-marked {
-  background: rgba(0, 128, 0, 0.5);
+.gfe-street-art-choose-cell svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  scale: 1.15;
 }
 
 .gfe-street-art-score {
@@ -353,8 +343,6 @@
   position: absolute;
   width: 3.8%;
   height: 25%;
-  border-radius: 50%;
-  border: 4px solid black;
 }
 
 .gfe-total-score {
@@ -374,16 +362,26 @@
   color: #c7c9c8;
 }
 
-/* Circle SVGs */
+/* Scribble circles on tracks */
 .gfe-collection-track-circle,
 .gfe-monument-track-circle,
 .gfe-ufo-track-circle,
 .gfe-mustsee-track-circle,
 .gfe-round-tracker-circle {
-  /* keep position / width / height */
   border: none;
   border-radius: 0;
   scale: 1.5;
+}
+
+.gfe-collection-track-circle svg,
+.gfe-monument-track-circle svg,
+.gfe-ufo-track-circle svg,
+.gfe-mustsee-track-circle svg,
+.gfe-round-tracker-circle svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
 }
 
 .gfe-scribble-circle.gfe-circle-draw {
