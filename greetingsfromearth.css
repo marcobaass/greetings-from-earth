@@ -175,8 +175,8 @@
 
 .gfe-monument-collection-track {
   position: absolute;
-  top: 82%;
-  left: 2%;
+  top: 82.7%;
+  left: 2.6%;
   width: 52%;
   height: 14%;
   pointer-events: none;
@@ -192,8 +192,8 @@
   position: absolute;
   width: 6%;
   height: 29%;
-  top: 59.4%;
-  left: 75.9%;
+  top: 57%;
+  left: 75.4%;
   transform: rotate(1.5deg);
 }
 
@@ -207,8 +207,8 @@
   position: absolute;
   width: 6%;
   height: 29%;
-  top: 20.4%;
-  left: 75.9%;
+  top: 18%;
+  left: 75.5%;
   transform: rotate(1.5deg);
 }
 
@@ -216,8 +216,8 @@
   position: absolute;
   width: 8%;
   height: 29%;
-  top: 42%;
-  left: 86.5%;
+  top: 38%;
+  left: 86.2%;
   transform: rotate(1.5deg);
 }
 
@@ -233,8 +233,8 @@
 
 .gfe-ufo-mustsee-track {
   position: absolute;
-  top: 82%;
-  left: 57.2%;
+  top: 82.7%;
+  left: 57.6%;
   width: 41%;
   height: 14%;
   pointer-events: none;
@@ -250,8 +250,8 @@
   position: absolute;
   width: 6%;
   height: 29%;
-  top: 57.4%;
-  left: 57.9%;
+  top: 53.1%;
+  left: 57.6%;
   transform: rotate(-1.5deg);
 }
 
@@ -265,8 +265,8 @@
   position: absolute;
   width: 6%;
   height: 29%;
-  top: 14.4%;
-  left: 57.5%;
+  top: 11.9%;
+  left: 57.4%;
   transform: rotate(-1.5deg);
 }
 
@@ -296,6 +296,9 @@
   width: 100%;
   height: 100%;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .gfe-street-art-choose-interactive .gfe-street-art-choose-cell {
   cursor: pointer;
@@ -305,8 +308,8 @@
 }
 
 .gfe-street-art-choose-cell svg {
-  width: 100%;
-  height: 100%;
+  width: 86%;
+  height: 86%;
   display: block;
   overflow: visible;
   scale: 1.15;
@@ -333,8 +336,8 @@
 
 .gfe-round-tracker {
   position: absolute;
-  top: 14%;
-  left: 44%;
+  top: 14.9%;
+  left: 44.6%;
   width: 33%;
   height: 7%;
 }
@@ -347,8 +350,8 @@
 
 .gfe-total-score {
   position: absolute;
-  top: 30.8%;
-  left: 71.3%;
+  top: 29.9%;
+  left: 70.7%;
   width: 22.6%;
   height: 50.1%;
   transform: rotate(-1.1deg);
