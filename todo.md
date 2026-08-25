@@ -93,7 +93,7 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] diffrent player sheet on top than actuall player
 - [x] diffrent color for alternative tiles
 - [x] single and two square tiles also as alternative for bonus tiles
-- [ ] layout shift through buttons top
+- [x] layout shift through buttons top
 - [ ] prevent hover on street art track and board grid when no streetart to select or no tile for the board choosen
 
 ## Later — placement UX

@@ -376,3 +376,18 @@
 .gfe-track-score-gray {
   color: #c7c9c8;
 }
+
+/* Status Bar */
+/* Keep status bar tall enough for 40×40 tile SVGs */
+#page-title {
+  min-height: 56px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#maintitlebar_content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
