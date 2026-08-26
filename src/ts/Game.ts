@@ -378,15 +378,48 @@ export class Game {
 
   // ===== Helper functions =====
 
-  private continueAfterPlacement(playerId: number, streetArtPending: number, pendingTiles: string[], awaitingTurnConfirm: boolean = false) {
+  private normalizeCoveredCells(
+    coveredCells: GreetingsFromEarthGamedatas["coveredCells"] | Record<string, { x: number; y: number; tile_type: string }>
+  ): GreetingsFromEarthGamedatas["coveredCells"] {
+    const list = Array.isArray(coveredCells) ? coveredCells : Object.values(coveredCells ?? {});
+    return list.map((cell) => ({
+      x: Number(cell.x),
+      y: Number(cell.y),
+      tile_type: cell.tile_type
+    }));
+  }
+
+  private normalizePlacements(
+    placements: GreetingsFromEarthGamedatas["placements"] | Record<string, GreetingsFromEarthGamedatas["placements"][number]>
+  ): GreetingsFromEarthGamedatas["placements"] {
+    const list = Array.isArray(placements) ? placements : Object.values(placements ?? {});
+    return list.map((p) => ({
+      tile_type: p.tile_type,
+      x: Number(p.x),
+      y: Number(p.y),
+      rotation: Number(p.rotation),
+      mirror: Number(p.mirror)
+    }));
+  }
+
+  private continueAfterPlacement(
+    playerId: number,
+    streetArtPending: number,
+    pendingTiles: string[],
+    awaitingTurnConfirm: boolean = false,
+    canSurviveRemaining?: boolean
+  ) {
     const myId = this.bga.players.getCurrentPlayerId();
-    if (playerId !== myId) return;
+    if (Number(playerId) !== Number(myId)) return;
 
     const ps = this.bga.gameui.gamedatas.playerState;
     ps.pending_bonus_tiles = JSON.stringify(pendingTiles);
     ps.street_art_pending = streetArtPending;
 
     this.placeTile.setCanUndo(true);
+    if (canSurviveRemaining !== undefined) {
+      this.placeTile.setCanSurviveRemaining(canSurviveRemaining);
+    }
 
     if (awaitingTurnConfirm) {
       this.placeTile.showConfirmEndTurn();
@@ -471,12 +504,14 @@ export class Game {
 
     const myId = this.bga.players.getCurrentPlayerId();
 
-    if (args.player_id === myId) {
+    if (Number(args.player_id) === Number(myId)) {
       const gamedatas = this.bga.gameui.gamedatas;
+      const covered = this.normalizeCoveredCells(gamedatas.coveredCells);
 
       cells.forEach(([x, y]) => {
-        gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+        covered.push({ x, y, tile_type: args.tile_type });
       });
+      gamedatas.coveredCells = covered;
 
       gamedatas.playerState.has_started = 1;
       gamedatas.playerState.last_x = args.x;
@@ -487,7 +522,13 @@ export class Game {
     }
 
     this.applyBoardScoringFromNotif(args);
-    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
+    this.continueAfterPlacement(
+      args.player_id,
+      args.street_art_pending ?? 0,
+      args.pending_tiles ?? [],
+      !!args.awaiting_turn_confirm,
+      args.can_survive_remaining
+    );
   }
 
   async notif_bonusTilePlaced(args: NotifTilePlacedArgs) {
@@ -501,12 +542,14 @@ export class Game {
 
     const myId = this.bga.players.getCurrentPlayerId();
 
-    if (args.player_id === myId) {
+    if (Number(args.player_id) === Number(myId)) {
       const gamedatas = this.bga.gameui.gamedatas;
+      const covered = this.normalizeCoveredCells(gamedatas.coveredCells);
 
       cells.forEach(([x, y]) => {
-        gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+        covered.push({ x, y, tile_type: args.tile_type });
       });
+      gamedatas.coveredCells = covered;
 
       gamedatas.playerState.has_started = 1;
       gamedatas.playerState.last_x = args.x;
@@ -517,7 +560,13 @@ export class Game {
     }
 
     this.applyBoardScoringFromNotif(args);
-    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
+    this.continueAfterPlacement(
+      args.player_id,
+      args.street_art_pending ?? 0,
+      args.pending_tiles ?? [],
+      !!args.awaiting_turn_confirm,
+      args.can_survive_remaining
+    );
   }
 
   async notif_streetArtChosen(args: NotifStreetArtChosenArgs) {
@@ -539,7 +588,13 @@ export class Game {
 
     this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
 
-    this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
+    this.continueAfterPlacement(
+      args.player_id,
+      args.street_art_pending ?? 0,
+      args.pending_tiles ?? [],
+      !!args.awaiting_turn_confirm,
+      args.can_survive_remaining
+    );
   }
 
   async notif_turnFinalized(args: NotifTurnFinalizedArgs) {
@@ -555,15 +610,16 @@ export class Game {
     }
 
     // 2. if this is MY undo, refresh client memory (needed for legal placement)
-    if (playerId === myId) {
-      this.bga.gameui.gamedatas.coveredCells = args.coveredCells;
-      this.bga.gameui.gamedatas.placements = args.placements;
+    if (Number(playerId) === Number(myId)) {
+      this.bga.gameui.gamedatas.coveredCells = this.normalizeCoveredCells(args.coveredCells);
+      this.bga.gameui.gamedatas.placements = this.normalizePlacements(args.placements);
       this.bga.gameui.gamedatas.playerState = args.playerState;
+      this.placeTile.clearCanSurviveRemaining();
     }
 
     // 3. redraw remaining tiles (same loop as setup ~277–288)
     const ps = args.playerState;
-    const placements = args.placements ?? [];
+    const placements = this.normalizePlacements(args.placements);
     for (const p of placements) {
       const isLast =
         Number(p.x) === Number(ps.last_x) &&
@@ -599,7 +655,7 @@ export class Game {
     this.renderStreetArtTrack(playerId, streetArt, Number(ps.street_art_score));
 
     // 5. if this is MY undo, reset UI back to “place a tile”
-    if (playerId === myId) {
+    if (Number(playerId) === Number(myId)) {
       this.placeTile.resetAfterUndo();
     }
   }

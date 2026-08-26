@@ -57,6 +57,7 @@ interface NotifTilePlacedArgs {
   pending_tiles?: string[];
   street_art_pending?: number;
   awaiting_turn_confirm?: boolean;
+  can_survive_remaining?: boolean;
   collection_count: number;
   collection_score: number;
   ufo_count: number;
@@ -101,6 +102,7 @@ interface NotifStreetArtChosenArgs {
   street_art_score: number;
   pending_tiles: string[];
   awaiting_turn_confirm?: boolean;
+  can_survive_remaining?: boolean;
 }
 
 interface NotifTurnUndoneArgs {

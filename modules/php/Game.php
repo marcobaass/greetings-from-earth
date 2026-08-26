@@ -184,6 +184,153 @@ class Game extends \Bga\GameFramework\Table {
         return false;
     }
 
+    /**
+     * True if there exists an I1-only placement sequence for every remaining round
+     * after the current one (depth = TOTAL_ROUNDS - current_round).
+     */
+    public function canI1BePlaced(int $playerId): bool {
+        $currentRound = (int) $this->getGameStateValue("current_round");
+        $depth = TOTAL_ROUNDS - $currentRound;
+        if ($depth <= 0) {
+            return true;
+        }
+
+        $coveredRows = $this->getObjectListFromDB(
+            "SELECT `x`, `y` FROM `player_cells` WHERE `player_id` = '$playerId'"
+        );
+        $covered = [];
+        foreach ($coveredRows as $row) {
+            $covered[cellKey((int) $row["x"], (int) $row["y"])] = true;
+        }
+
+        $playerState = $this->getObjectFromDB("SELECT * FROM `player_state` WHERE `player_id` = '$playerId'");
+        $hasStarted = (int) $playerState["has_started"] !== 0;
+        $lastCells = [];
+        if ($hasStarted && $playerState["last_tile_type"] !== null) {
+            $lastCells = getShapeCells(
+                $playerState["last_tile_type"],
+                (int) $playerState["last_x"],
+                (int) $playerState["last_y"],
+                (int) $playerState["last_rotation"],
+                ((int) $playerState["last_mirror"]) === 1
+            );
+        }
+
+        $memo = [];
+        return $this->canSurviveRemainingRoundsWithI1($depth, $covered, $hasStarted, $lastCells, $memo);
+    }
+
+    /**
+     * @param array<string, true> $covered
+     * @param list<array{0: int|float, 1: int|float}> $lastCells
+     * @param array<string, bool> $memo
+     */
+    private function canSurviveRemainingRoundsWithI1(
+        int $depth,
+        array $covered,
+        bool $hasStarted,
+        array $lastCells,
+        array &$memo
+    ): bool {
+        if ($depth <= 0) {
+            return true;
+        }
+
+        $memoKey = $this->i1SurvivalMemoKey($depth, $covered, $hasStarted, $lastCells);
+        if (isset($memo[$memoKey])) {
+            return $memo[$memoKey];
+        }
+
+        foreach ($this->collectLegalI1Moves($covered, $hasStarted, $lastCells) as $move) {
+            $nx = (int) $move[0];
+            $ny = (int) $move[1];
+            $nextCovered = $covered;
+            $nextCovered[cellKey($nx, $ny)] = true;
+            if ($this->canSurviveRemainingRoundsWithI1($depth - 1, $nextCovered, true, [[$nx, $ny]], $memo)) {
+                return $memo[$memoKey] = true;
+            }
+        }
+
+        return $memo[$memoKey] = false;
+    }
+
+    /**
+     * @param array<string, true> $covered
+     * @param list<array{0: int|float, 1: int|float}> $lastCells
+     * @return list<array{0: int, 1: int}>
+     */
+    private function collectLegalI1Moves(array $covered, bool $hasStarted, array $lastCells): array {
+        $references = getSbahnCellSet();
+        if ($hasStarted) {
+            foreach ($lastCells as $lastCell) {
+                $references[cellKey((int) $lastCell[0], (int) $lastCell[1])] = true;
+            }
+        }
+
+        $deltas = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        $seen = [];
+        $moves = [];
+
+        foreach (array_keys($references) as $refKey) {
+            [$rx, $ry] = array_map("intval", explode(",", $refKey));
+            foreach ($deltas as [$dx, $dy]) {
+                $nx = $rx + $dx;
+                $ny = $ry + $dy;
+                $nKey = cellKey($nx, $ny);
+                if (isset($seen[$nKey])) {
+                    continue;
+                }
+                $seen[$nKey] = true;
+
+                if ($this->isHypotheticalI1Legal($nx, $ny, $covered, $references)) {
+                    $moves[] = [$nx, $ny];
+                }
+            }
+        }
+
+        return $moves;
+    }
+
+    /**
+     * @param array<string, true> $covered
+     * @param array<string, true> $references
+     */
+    private function isHypotheticalI1Legal(int $x, int $y, array $covered, array $references): bool {
+        if ($x < 0 || $x > 17 || $y < 0 || $y > 12) {
+            return false;
+        }
+        $type = getCellType($x, $y);
+        if (in_array($type, [CELL_RIVER, CELL_SBAHN, CELL_MONUMENT], true)) {
+            return false;
+        }
+        if (isset($covered[cellKey($x, $y)])) {
+            return false;
+        }
+
+        foreach ([[$x + 1, $y], [$x - 1, $y], [$x, $y + 1], [$x, $y - 1]] as $neighbour) {
+            if (isset($references[cellKey((int) $neighbour[0], (int) $neighbour[1])])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string, true> $covered
+     * @param list<array{0: int|float, 1: int|float}> $lastCells
+     */
+    private function i1SurvivalMemoKey(int $depth, array $covered, bool $hasStarted, array $lastCells): string {
+        $coverKeys = array_keys($covered);
+        sort($coverKeys);
+        $lastKeys = [];
+        foreach ($lastCells as $cell) {
+            $lastKeys[] = cellKey((int) $cell[0], (int) $cell[1]);
+        }
+        sort($lastKeys);
+        return $depth . "|" . ($hasStarted ? "1" : "0") . "|" . implode(";", $lastKeys) . "|" . implode(";", $coverKeys);
+    }
+
     // ===== TILE PLACEMENT =====
 
     public function placeTile(int $playerId, string $tileType, int $x, int $y, int $rotation, bool $mirror): void {
@@ -551,6 +698,7 @@ class Game extends \Bga\GameFramework\Table {
             "pending_tiles" => $this->getPendingBonusTiles($playerId),
             "street_art_pending" => (int) $state["street_art_pending"],
             "street_art_completed" => json_decode($state["street_art_completed"] ?? "[]", true) ?? [],
+            "can_survive_remaining" => $this->canI1BePlaced($playerId),
         ];
     }
 
@@ -618,7 +766,8 @@ class Game extends \Bga\GameFramework\Table {
             "SELECT `cells_this_turn` FROM `player_state`
              WHERE `player_id` = '$playerId'"
         );
-        return json_decode($state["cells_this_turn"], true);
+        $cells = json_decode($state["cells_this_turn"] ?? "[]", true);
+        return is_array($cells) ? $cells : [];
     }
 
     public function addCellsThisTurn(int $playerId, array $cells): void {

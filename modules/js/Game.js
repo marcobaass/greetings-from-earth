@@ -207,13 +207,15 @@ function tileButtonHtml(tileType) {
     return `<svg width="40" height="40" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg"><path d="${outline}" fill="none" stroke="white" stroke-width="0.25"/></svg>`;
 }
 
+const TOTAL_ROUNDS = 14;
 /** Checks if the tile overlaps with the covered cells
  * @param tileCells - The cells of the tile to check for overlap
  * @param coveredCells - The cells that are already covered
  * @returns true if the tile overlaps with the covered cells, false otherwise
  */
 function overlapsCoveredCells(tileCells, coveredCells) {
-    const covered = new Set(coveredCells.map((cell) => cellKey(cell.x, cell.y)));
+    const list = (Array.isArray(coveredCells) ? coveredCells : Object.values(coveredCells ?? {}));
+    const covered = new Set(list.map((cell) => cellKey(Number(cell.x), Number(cell.y))));
     return tileCells.some(([x, y]) => covered.has(cellKey(x, y)));
 }
 function orthogonalNeighbors(x, y) {
@@ -234,14 +236,6 @@ function getLastPlacedTileCells(playerState) {
         return [];
     return getShapeCells(playerState.last_tile_type, Number(playerState.last_x), Number(playerState.last_y), Number(playerState.last_rotation), Number(playerState.last_mirror) === 1);
 }
-//   if overlapsCoveredCells(tileCells, gamedatas.coveredCells): return false
-//   sbahnRefs = getSbahnCellSet()
-//   if NOT gamedatas.playerState.has_started:
-//     referenceSet = sbahnRefs
-//   else:
-//     lastCells = getLastPlacedTileCells(gamedatas.playerState)
-//     referenceSet = new Set([...sbahnRefs, ...lastCells.map(([x,y]) => cellKey(x,y))])
-//   return touchesAny(tileCells, referenceSet)
 function isPlacementLegal(tileCells, gamedatas) {
     if (!isInsideGrid(tileCells))
         return false;
@@ -261,6 +255,74 @@ function isPlacementLegal(tileCells, gamedatas) {
         referenceSet = new Set([...getSbahnCellSet(), ...lastCells.map(([x, y]) => cellKey(x, y))]);
     }
     return touchesAny(tileCells, referenceSet);
+}
+function buildReferenceSet(hasStarted, lastCells) {
+    if (!hasStarted)
+        return getSbahnCellSet();
+    return new Set([...getSbahnCellSet(), ...lastCells.map(([x, y]) => cellKey(x, y))]);
+}
+function isHypotheticalI1Legal(x, y, covered, references) {
+    if (!isInsideGrid([[x, y]]))
+        return false;
+    if (FORBIDDEN_CELL_TYPES.has(getCellType(x, y)))
+        return false;
+    if (covered.has(cellKey(x, y)))
+        return false;
+    return orthogonalNeighbors(x, y).some(([nx, ny]) => references.has(cellKey(nx, ny)));
+}
+function collectLegalI1Moves(covered, hasStarted, lastCells) {
+    const references = buildReferenceSet(hasStarted, lastCells);
+    const seen = new Set();
+    const moves = [];
+    for (const refKey of references) {
+        const [rx, ry] = refKey.split(",").map(Number);
+        for (const [nx, ny] of orthogonalNeighbors(rx, ry)) {
+            const nKey = cellKey(nx, ny);
+            if (seen.has(nKey))
+                continue;
+            seen.add(nKey);
+            if (isHypotheticalI1Legal(nx, ny, covered, references)) {
+                moves.push([nx, ny]);
+            }
+        }
+    }
+    return moves;
+}
+function i1SurvivalMemoKey(depth, covered, hasStarted, lastCells) {
+    const coverKeys = [...covered].sort();
+    const lastKeys = lastCells.map(([x, y]) => cellKey(x, y)).sort();
+    return `${depth}|${hasStarted ? 1 : 0}|${lastKeys.join(";")}|${coverKeys.join(";")}`;
+}
+function canSurviveRemainingRoundsWithI1(depth, covered, hasStarted, lastCells, memo) {
+    if (depth <= 0)
+        return true;
+    const key = i1SurvivalMemoKey(depth, covered, hasStarted, lastCells);
+    const cached = memo.get(key);
+    if (cached !== undefined)
+        return cached;
+    for (const [nx, ny] of collectLegalI1Moves(covered, hasStarted, lastCells)) {
+        const nextCovered = new Set(covered);
+        nextCovered.add(cellKey(nx, ny));
+        if (canSurviveRemainingRoundsWithI1(depth - 1, nextCovered, true, [[nx, ny]], memo)) {
+            memo.set(key, true);
+            return true;
+        }
+    }
+    memo.set(key, false);
+    return false;
+}
+/**
+ * True if an I1-only path exists for every remaining round after the current one.
+ */
+function canI1BePlaced(gamedatas) {
+    const depth = TOTAL_ROUNDS - Number(gamedatas.currentRound);
+    if (!Number.isFinite(depth) || depth <= 0)
+        return true;
+    const coveredList = (Array.isArray(gamedatas.coveredCells) ? gamedatas.coveredCells : Object.values(gamedatas.coveredCells ?? {}));
+    const covered = new Set(coveredList.map((cell) => cellKey(Number(cell.x), Number(cell.y))));
+    const hasStarted = Number(gamedatas.playerState.has_started) !== 0;
+    const lastCells = hasStarted ? getLastPlacedTileCells(gamedatas.playerState) : [];
+    return canSurviveRemainingRoundsWithI1(depth, covered, hasStarted, lastCells, new Map());
 }
 
 class PlaceTile {
@@ -635,12 +697,18 @@ class PlaceTile {
             streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
             streetArtGrid.removeEventListener("click", this.onStreetArtClick);
         }
-        this.bga.statusBar.setTitle(this.canUndo ? _("${you}: undo, or end your turn") : _("${you} must end your turn"));
         this.bga.statusBar.removeActionButtons();
         this.addUndoButtonIfPossible();
-        this.bga.statusBar.addActionButton(_("End turn"), () => {
-            this.bga.actions.performAction("actEndTurn", {});
-        });
+        const canSurvive = this.canSurviveRemaining ?? canI1BePlaced(this.bga.gameui.gamedatas);
+        if (canSurvive) {
+            this.bga.statusBar.setTitle(this.canUndo ? _("${you}: undo, or end your turn") : _("${you} must end your turn"));
+            this.bga.statusBar.addActionButton(_("End turn"), () => {
+                this.bga.actions.performAction("actEndTurn", {});
+            });
+        }
+        else {
+            this.bga.statusBar.setTitle(_("${you}: this placement cannot reach the end of the game — please undo"));
+        }
     }
     constructor(game, bga) {
         this.game = game;
@@ -654,6 +722,8 @@ class PlaceTile {
         this.awaitingEndTurn = false;
         /** True only after a change this turn that can be reverted */
         this.canUndo = false;
+        /** Server forecast: I1 path exists for remaining rounds. null = recompute locally. */
+        this.canSurviveRemaining = null;
         this.followingMouse = false;
         this.onGridClick = (event) => {
             this.followingMouse = false;
@@ -766,9 +836,16 @@ class PlaceTile {
         this.resetPlacementState();
         this.awaitingEndTurn = false;
         this.canUndo = false;
+        this.canSurviveRemaining = null;
         if (!this.placeTileArgs)
             return;
         this.onEnteringState(this.placeTileArgs, true);
+    }
+    setCanSurviveRemaining(value) {
+        this.canSurviveRemaining = value;
+    }
+    clearCanSurviveRemaining() {
+        this.canSurviveRemaining = null;
     }
 }
 
@@ -1198,14 +1275,35 @@ class Game {
             roundEl.textContent = String(args.round);
     }
     // ===== Helper functions =====
-    continueAfterPlacement(playerId, streetArtPending, pendingTiles, awaitingTurnConfirm = false) {
+    normalizeCoveredCells(coveredCells) {
+        const list = Array.isArray(coveredCells) ? coveredCells : Object.values(coveredCells ?? {});
+        return list.map((cell) => ({
+            x: Number(cell.x),
+            y: Number(cell.y),
+            tile_type: cell.tile_type
+        }));
+    }
+    normalizePlacements(placements) {
+        const list = Array.isArray(placements) ? placements : Object.values(placements ?? {});
+        return list.map((p) => ({
+            tile_type: p.tile_type,
+            x: Number(p.x),
+            y: Number(p.y),
+            rotation: Number(p.rotation),
+            mirror: Number(p.mirror)
+        }));
+    }
+    continueAfterPlacement(playerId, streetArtPending, pendingTiles, awaitingTurnConfirm = false, canSurviveRemaining) {
         const myId = this.bga.players.getCurrentPlayerId();
-        if (playerId !== myId)
+        if (Number(playerId) !== Number(myId))
             return;
         const ps = this.bga.gameui.gamedatas.playerState;
         ps.pending_bonus_tiles = JSON.stringify(pendingTiles);
         ps.street_art_pending = streetArtPending;
         this.placeTile.setCanUndo(true);
+        if (canSurviveRemaining !== undefined) {
+            this.placeTile.setCanSurviveRemaining(canSurviveRemaining);
+        }
         if (awaitingTurnConfirm) {
             this.placeTile.showConfirmEndTurn();
             return;
@@ -1252,11 +1350,13 @@ class Game {
         this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror, true);
         const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
         const myId = this.bga.players.getCurrentPlayerId();
-        if (args.player_id === myId) {
+        if (Number(args.player_id) === Number(myId)) {
             const gamedatas = this.bga.gameui.gamedatas;
+            const covered = this.normalizeCoveredCells(gamedatas.coveredCells);
             cells.forEach(([x, y]) => {
-                gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+                covered.push({ x, y, tile_type: args.tile_type });
             });
+            gamedatas.coveredCells = covered;
             gamedatas.playerState.has_started = 1;
             gamedatas.playerState.last_x = args.x;
             gamedatas.playerState.last_y = args.y;
@@ -1265,7 +1365,7 @@ class Game {
             gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
         }
         this.applyBoardScoringFromNotif(args);
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm, args.can_survive_remaining);
     }
     async notif_bonusTilePlaced(args) {
         document
@@ -1275,11 +1375,13 @@ class Game {
         this.drawTileOnSVG(args.player_id, args.tile_type, args.x, args.y, args.rotation, args.mirror, true);
         const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
         const myId = this.bga.players.getCurrentPlayerId();
-        if (args.player_id === myId) {
+        if (Number(args.player_id) === Number(myId)) {
             const gamedatas = this.bga.gameui.gamedatas;
+            const covered = this.normalizeCoveredCells(gamedatas.coveredCells);
             cells.forEach(([x, y]) => {
-                gamedatas.coveredCells.push({ x, y, tile_type: args.tile_type });
+                covered.push({ x, y, tile_type: args.tile_type });
             });
+            gamedatas.coveredCells = covered;
             gamedatas.playerState.has_started = 1;
             gamedatas.playerState.last_x = args.x;
             gamedatas.playerState.last_y = args.y;
@@ -1288,7 +1390,7 @@ class Game {
             gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
         }
         this.applyBoardScoringFromNotif(args);
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm, args.can_survive_remaining);
     }
     async notif_streetArtChosen(args) {
         const ps = this.bga.gameui.gamedatas.playerState;
@@ -1298,7 +1400,7 @@ class Game {
             this.renderMustSeeUfoTrack(args.player_id, ps.ufo_count, mustsee.length, ps.mustsee_score, ps.ufo_score, ps.monument_collection_score, ps.street_art_score);
         }
         this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm, args.can_survive_remaining);
     }
     async notif_turnFinalized(args) {
         this.applyBoardScoringFromNotif(args);
@@ -1311,14 +1413,15 @@ class Game {
             layer.innerHTML = "";
         }
         // 2. if this is MY undo, refresh client memory (needed for legal placement)
-        if (playerId === myId) {
-            this.bga.gameui.gamedatas.coveredCells = args.coveredCells;
-            this.bga.gameui.gamedatas.placements = args.placements;
+        if (Number(playerId) === Number(myId)) {
+            this.bga.gameui.gamedatas.coveredCells = this.normalizeCoveredCells(args.coveredCells);
+            this.bga.gameui.gamedatas.placements = this.normalizePlacements(args.placements);
             this.bga.gameui.gamedatas.playerState = args.playerState;
+            this.placeTile.clearCanSurviveRemaining();
         }
         // 3. redraw remaining tiles (same loop as setup ~277–288)
         const ps = args.playerState;
-        const placements = args.placements ?? [];
+        const placements = this.normalizePlacements(args.placements);
         for (const p of placements) {
             const isLast = Number(p.x) === Number(ps.last_x) &&
                 Number(p.y) === Number(ps.last_y) &&
@@ -1335,7 +1438,7 @@ class Game {
         this.renderMustSeeUfoTrack(playerId, Number(ps.ufo_count), mustsee.length, Number(ps.mustsee_score), Number(ps.ufo_score), Number(ps.monument_collection_score), Number(ps.street_art_score));
         this.renderStreetArtTrack(playerId, streetArt, Number(ps.street_art_score));
         // 5. if this is MY undo, reset UI back to “place a tile”
-        if (playerId === myId) {
+        if (Number(playerId) === Number(myId)) {
             this.placeTile.resetAfterUndo();
         }
     }

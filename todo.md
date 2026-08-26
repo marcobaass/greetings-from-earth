@@ -107,7 +107,7 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] ring controls on board (Ark Nova style)
 - [ ] option when player can not make a move anymore (game end for specific player)
 - [?] Soundeffects
-- [ ] Hover Icons
+- [?] Hover Icons
 
 ---
 

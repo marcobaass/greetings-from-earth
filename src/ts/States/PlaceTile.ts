@@ -1,5 +1,5 @@
 import { Game } from "../Game";
-import { isPlacementLegal } from "../placement";
+import { isPlacementLegal, canI1BePlaced } from "../placement";
 import { computeTileShift, getShapeCells, isInsideGrid, cellsToOutlinePath, tileButtonHtml } from "../tiles";
 
 export class PlaceTile {
@@ -12,6 +12,8 @@ export class PlaceTile {
   private awaitingEndTurn = false;
   /** True only after a change this turn that can be reverted */
   private canUndo = false;
+  /** Server forecast: I1 path exists for remaining rounds. null = recompute locally. */
+  private canSurviveRemaining: boolean | null = null;
   private followingMouse = false;
 
   private onGridClick = (event: MouseEvent) => {
@@ -500,12 +502,19 @@ export class PlaceTile {
       streetArtGrid.removeEventListener("click", this.onStreetArtClick);
     }
 
-    this.bga.statusBar.setTitle(this.canUndo ? _("${you}: undo, or end your turn") : _("${you} must end your turn"));
     this.bga.statusBar.removeActionButtons();
     this.addUndoButtonIfPossible();
-    this.bga.statusBar.addActionButton(_("End turn"), () => {
-      this.bga.actions.performAction("actEndTurn", {});
-    });
+    const canSurvive = this.canSurviveRemaining ?? canI1BePlaced(this.bga.gameui.gamedatas);
+    if (canSurvive) {
+      this.bga.statusBar.setTitle(this.canUndo ? _("${you}: undo, or end your turn") : _("${you} must end your turn"));
+      this.bga.statusBar.addActionButton(_("End turn"), () => {
+        this.bga.actions.performAction("actEndTurn", {});
+      });
+    } else {
+      this.bga.statusBar.setTitle(
+        _("${you}: this placement cannot reach the end of the game — please undo")
+      );
+    }
   }
 
   constructor(
@@ -586,7 +595,16 @@ export class PlaceTile {
     this.resetPlacementState();
     this.awaitingEndTurn = false;
     this.canUndo = false;
+    this.canSurviveRemaining = null;
     if (!this.placeTileArgs) return;
     this.onEnteringState(this.placeTileArgs, true);
+  }
+
+  public setCanSurviveRemaining(value: boolean) {
+    this.canSurviveRemaining = value;
+  }
+
+  public clearCanSurviveRemaining() {
+    this.canSurviveRemaining = null;
   }
 }

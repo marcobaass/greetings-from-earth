@@ -71,6 +71,7 @@ class PlaceTile extends GameState {
                     "street_art_pending" => $status["street_art_pending"],
                     "street_art_completed" => $status["street_art_completed"],
                     "awaiting_turn_confirm" => $status["awaiting_turn_confirm"],
+                    "can_survive_remaining" => $status["can_survive_remaining"],
                 ],
                 $scoring
             )
@@ -139,6 +140,12 @@ class PlaceTile extends GameState {
             throw new UserException(clienttranslate("You must place a tile before ending your turn"));
         }
 
+        if (!$this->game->canI1BePlaced($currentPlayerId)) {
+            throw new UserException(
+                clienttranslate("This placement cannot reach the end of the game with 1-square tiles. Please undo and choose a different placement.")
+            );
+        }
+
         $this->game->finalizeTurn($currentPlayerId);
         $this->game->invalidateTurnUndo($currentPlayerId);
         $this->game->setTurnEnded($currentPlayerId, true);
@@ -185,6 +192,7 @@ class PlaceTile extends GameState {
                     "street_art_pending" => $status["street_art_pending"],
                     "street_art_completed" => $status["street_art_completed"],
                     "awaiting_turn_confirm" => $status["awaiting_turn_confirm"],
+                    "can_survive_remaining" => $status["can_survive_remaining"],
                 ],
                 $scoring
             )
@@ -222,6 +230,7 @@ class PlaceTile extends GameState {
             "street_art_score" => (int) $state["street_art_score"],
             "pending_tiles" => $status["pending_tiles"],
             "awaiting_turn_confirm" => $status["awaiting_turn_confirm"],
+            "can_survive_remaining" => $status["can_survive_remaining"],
         ]);
 
         $this->game->keepPlayersInRoundActive(NewRound::class);
