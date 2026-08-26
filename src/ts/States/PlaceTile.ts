@@ -76,6 +76,9 @@ export class PlaceTile {
       el.classList.remove("gfe-cell-anchor");
     });
     document.getElementById(`gfe-tiles-layer-${this.bga.players.getCurrentPlayerId()}`)?.querySelector("#gfe-preview-crosshair")?.remove();
+    grid.querySelectorAll(".gfe-tile-button").forEach((el) => {
+      el.remove();
+    });
   }
 
   /**
@@ -234,7 +237,96 @@ export class PlaceTile {
 
     if (!this.placeTileArgs) return;
 
+    this.addButtonsForTile(cells, legal, grid);
     this.updateActionButtons(legal, grid);
+  }
+
+  private addButtonsForTile(cells: [number, number][], legal: boolean, grid: HTMLElement) {
+    if (this.followingMouse) return;
+
+    // calculating center origin of the tile
+    const xs = cells.map(([x]) => x);
+    const ys = cells.map(([, y]) => y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const centerX = (minX + maxX + 1) / 2;
+    const centerY = (minY + maxY + 1) / 2;
+
+    // offset from center for each button
+    const leftPct = (centerX / 18) * 100;
+    const topPct = (centerY / 13) * 100;
+    const gapH = 13 * 1.25;
+    const gapV = 18 * 1.25;
+
+    const mirrorButton = document.createElement("button");
+    mirrorButton.className = "gfe-tile-button";
+    mirrorButton.textContent = "↔";
+    mirrorButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
+      this.mirror = !this.mirror;
+      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+    });
+    mirrorButton.style.left = `${leftPct}%`;
+    mirrorButton.style.top = `${topPct - gapV}%`;
+    grid.appendChild(mirrorButton);
+
+    const rotateLeftButton = document.createElement("button");
+    rotateLeftButton.className = "gfe-tile-button";
+    rotateLeftButton.textContent = "↻";
+    rotateLeftButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
+      this.rotation = (this.rotation + 90) % 360;
+      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+    });
+    rotateLeftButton.style.left = `${leftPct - gapH}%`;
+    rotateLeftButton.style.top = `${topPct}%`;
+    grid.appendChild(rotateLeftButton);
+
+    const rotateRightButton = document.createElement("button");
+    rotateRightButton.className = "gfe-tile-button";
+    rotateRightButton.textContent = "↺";
+    rotateRightButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
+      this.rotation = (this.rotation + 270) % 360;
+      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+    });
+    rotateRightButton.style.left = `${leftPct + gapH}%`;
+    rotateRightButton.style.top = `${topPct}%`;
+    grid.appendChild(rotateRightButton);
+
+    const confirmButton = document.createElement("button");
+    confirmButton.className = "gfe-tile-button";
+    confirmButton.textContent = "✔";
+    confirmButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
+      if (!legal) return;
+      const cells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
+      if (!isPlacementLegal(cells, this.bga.gameui.gamedatas)) return;
+
+      const action = this.pendingTiles.length > 0 ? "actPlaceBonusTile" : "actPlaceTile";
+
+      this.bga.actions.performAction(action, {
+        tileType: this.tileSelected,
+        x: this.anchorX,
+        y: this.anchorY,
+        rotation: this.rotation,
+        mirror: this.mirror
+      });
+    });
+    confirmButton.style.left = `${leftPct}%`;
+    confirmButton.style.top = `${topPct + gapV}%`;
+    if (legal) {
+      confirmButton.style.backgroundColor = "#1362a5";
+    } else {
+      confirmButton.disabled = !legal;
+    }
+    grid.appendChild(confirmButton);
   }
 
   private selectTile(tile: string, grid: HTMLElement): void {

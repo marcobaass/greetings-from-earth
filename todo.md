@@ -104,7 +104,7 @@ Each round the dice offers 2 polyomino options (`tileOptions`). Players may inst
 - [x] SVG scribbled circles on tracks and streetart / circles off after removing borders
 - [x] animations for circles
 - [x] undo does not remove green squares on streetart track
-- [ ] ring controls on board (Ark Nova style)
+- [x] ring controls on board (Ark Nova style)
 - [ ] option when player can not make a move anymore (game end for specific player)
 - [?] Soundeffects
 - [ ] Hover Icons

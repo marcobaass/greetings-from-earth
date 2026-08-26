@@ -412,3 +412,31 @@
   align-items: center;
   justify-content: center;
 }
+
+/* Tile buttons */
+.gfe-tile-button {
+  color: #fff;
+  font-size: 16px;
+  font-weight: bold;
+  text-align: center;
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  background: #1362a5;
+  border: 1px solid #333;
+  border-radius: 4px;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  cursor: pointer;
+  box-shadow: rgba(0, 0, 0, 0.2) 3px 3px 3.5px;
+  transition: background 0.2s ease;
+}
+
+.gfe-tile-button:hover:not(:disabled) {
+  background: linear-gradient(#4d92ce, #1362a5);
+}
+
+.gfe-tile-button:disabled {
+  background: rgb(131, 131, 131);
+  cursor: default;
+}
