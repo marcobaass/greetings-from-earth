@@ -1,4 +1,8 @@
 <?php
+// BGA framework: Gregory Isabelli & Emmanuel Colin & BoardGameArena
+// GreetingsFromEarth implementation : © Marco Baaß <picture@marcobaass.com>
+// This code has been produced on the BGA studio platform for use on http://boardgamearena.com.
+// See http://en.boardgamearena.com/#!doc/Studio for more information.
 declare(strict_types=1);
 
 /**
@@ -8,8 +12,7 @@ declare(strict_types=1);
  * @return array - The rotated shape
  */
 
-function getShapeCells(string $tileType, int $anchorX, int $anchorY, int $rotation = 0, bool $mirror = false): array
-{
+function getShapeCells(string $tileType, int $anchorX, int $anchorY, int $rotation = 0, bool $mirror = false): array {
     if (!isset(TILE_SHAPES[$tileType])) {
         return [];
     }
@@ -28,7 +31,7 @@ function getShapeCells(string $tileType, int $anchorX, int $anchorY, int $rotati
     return $cells;
 }
 
-function applyRotation(array $offsets, int $rotation): array { 
+function applyRotation(array $offsets, int $rotation): array {
     $result = [];
     foreach ($offsets as $offset) {
         $dx = $offset[0];
@@ -50,7 +53,7 @@ function applyRotation(array $offsets, int $rotation): array {
                 $newX = $dy;
                 $newY = -$dx;
                 break;
-            }
+        }
         $result[] = [$newX, $newY];
     }
     return $result;

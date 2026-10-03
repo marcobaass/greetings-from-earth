@@ -506,14 +506,12 @@ export class PlaceTile {
     this.addUndoButtonIfPossible();
     const canSurvive = this.canSurviveRemaining ?? canI1BePlaced(this.bga.gameui.gamedatas);
     if (canSurvive) {
-      this.bga.statusBar.setTitle(this.canUndo ? _("${you}: undo, or end your turn") : _("${you} must end your turn"));
+      this.bga.statusBar.setTitle(this.canUndo ? _("${you} may undo or end your turn") : _("${you} must end your turn"));
       this.bga.statusBar.addActionButton(_("End turn"), () => {
         this.bga.actions.performAction("actEndTurn", {});
       });
     } else {
-      this.bga.statusBar.setTitle(
-        _("${you}: this placement cannot reach the end of the game — please undo")
-      );
+      this.bga.statusBar.setTitle(_("${you} cannot reach the end of the game with this placement — please undo"));
     }
   }
 

@@ -13,7 +13,6 @@ export class Game {
   private scribbleCounts = new Map<string, number>();
 
   constructor(bga: Bga<GreetingsFromEarthPlayer, GreetingsFromEarthGamedatas>) {
-    console.log("greetingsfromearth constructor");
     this.bga = bga;
 
     // Register state classes — names must match PHP state class names
@@ -238,7 +237,6 @@ export class Game {
 
   // This is called when the game is setup
   setup(gamedatas: GreetingsFromEarthGamedatas) {
-    console.log("Starting game setup", gamedatas);
     this.gamedatas = gamedatas;
 
     // Set up the game area
@@ -269,12 +267,7 @@ export class Game {
                     <strong>${player.name}</strong>
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
-
-                        <!-- SVG layer for tiles -->
-                        <svg id="gfe-tiles-layer-${playerId}" class="gfe-tiles-layer" viewBox="0 0 18 13" preserveAspectRatio="none">
-
-                        </svg>
-
+                        <svg id="gfe-tiles-layer-${playerId}" class="gfe-tiles-layer" viewBox="0 0 18 13" preserveAspectRatio="none"></svg>
                         <div id="gfe-dice-roll-${playerId}" class="gfe-dice-indicator gfe-dice-${gamedatas.diceRoll}"></div>
                         <div id="gfe-monument-collection-track-${playerId}" class="gfe-monument-collection-track"></div>
                         <div id="gfe-ufo-mustsee-track-${playerId}" class="gfe-ufo-mustsee-track"></div>
@@ -282,11 +275,15 @@ export class Game {
                         <div id="gfe-street-art-choose-${playerId}" class="gfe-street-art-choose"></div>
                         <div id="gfe-round-tracker-${playerId}" class="gfe-round-tracker"></div>
                     </div>
-                    
                 </div>
-
             `
       );
+
+      // Theme URL is reliable when CSS is minified/served from another path
+      const sheetEl = document.getElementById(`gfe-sheet-${playerId}`);
+      if (sheetEl) {
+        sheetEl.style.backgroundImage = `url(${g_gamethemeurl}img/berlin_map.jpg)`;
+      }
 
       // Set up player's play grid
       const playGridEl = document.getElementById(`gfe-play-grid-${playerId}`);
@@ -356,16 +353,13 @@ export class Game {
     );
 
     this.setupNotifications();
-    console.log("Ending game setup");
   }
 
   setupNotifications() {
-    console.log("notifications subscriptions setup");
     this.bga.notifications.setupPromiseNotifications({});
   }
 
   async notif_newRound(args: NotifNewRoundArgs) {
-    console.log("New round:", args.round, "Dice roll:", args.dice_roll);
     this.placeTile.clearPendingTiles();
     this.placeTile.setCanUndo(false);
     this.bga.gameui.gamedatas.currentRound = args.round;

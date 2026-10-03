@@ -1,4 +1,8 @@
 <?php
+// BGA framework: Gregory Isabelli & Emmanuel Colin & BoardGameArena
+// GreetingsFromEarth implementation : © Marco Baaß <picture@marcobaass.com>
+// This code has been produced on the BGA studio platform for use on http://boardgamearena.com.
+// See http://en.boardgamearena.com/#!doc/Studio for more information.
 
 declare(strict_types=1);
 
@@ -48,7 +52,7 @@ class PlaceTile extends GameState {
         $diceRoll = (int) $this->game->getGameStateValue("dice_roll");
         $validTiles = array_merge(Game::DICE_WHEEL[$diceRoll], ALWAYS_AVAILABLE_TILES);
         if (!in_array($tileType, $validTiles)) {
-            throw new UserException("Invalid tile choice");
+            throw new UserException(clienttranslate("Invalid tile choice"));
         }
 
         $this->game->placeTile($currentPlayerId, $tileType, $x, $y, $rotation, $mirror);
@@ -108,7 +112,7 @@ class PlaceTile extends GameState {
 
         $playerState = $this->game->getObjectFromDb("SELECT * FROM `player_state` WHERE `player_id` = '$currentPlayerId'");
 
-        $this->notify->all("turnUndone", clienttranslate('${player_name} undoes their turn'), [
+        $this->notify->all("turnUndone", clienttranslate('${player_name} undoes the turn'), [
             "player_id" => $currentPlayerId,
             "player_name" => $this->game->getPlayerNameById($currentPlayerId),
             "coveredCells" => $coveredCells,
@@ -142,7 +146,9 @@ class PlaceTile extends GameState {
 
         if (!$this->game->canI1BePlaced($currentPlayerId)) {
             throw new UserException(
-                clienttranslate("This placement cannot reach the end of the game with 1-square tiles. Please undo and choose a different placement.")
+                clienttranslate(
+                    "This placement cannot reach the end of the game with 1-square tiles. Please undo and choose a different placement."
+                )
             );
         }
 
@@ -150,7 +156,7 @@ class PlaceTile extends GameState {
         $this->game->invalidateTurnUndo($currentPlayerId);
         $this->game->setTurnEnded($currentPlayerId, true);
 
-        $this->notify->all("turnEnded", clienttranslate('${player_name} ends their turn'), [
+        $this->notify->all("turnEnded", clienttranslate('${player_name} ends the turn'), [
             "player_id" => $currentPlayerId,
             "player_name" => $this->game->getPlayerNameById($currentPlayerId),
         ]);
@@ -170,7 +176,7 @@ class PlaceTile extends GameState {
         }
 
         if (!$this->game->isValidBonusTileChoice($currentPlayerId, $tileType)) {
-            throw new UserException("Invalid bonus tile choice");
+            throw new UserException(clienttranslate("Invalid bonus tile choice"));
         }
         $this->game->placeBonusTile($currentPlayerId, $tileType, $x, $y, $rotation, $mirror);
         $status = $this->game->afterPlacementStatus($currentPlayerId);

@@ -1,7 +1,7 @@
 /**
  *------
  * BGA framework: Gregory Isabelli & Emmanuel Colin & BoardGameArena
- * GreetingsFromEarth implementation : © <Your name here> <Your email address here>
+ * GreetingsFromEarth implementation : © <Marco Baaß> <picture@marcobaass.com>
  *
  * This code has been produced on the BGA studio platform for use on http://boardgamearena.com.
  * See http://en.boardgamearena.com/#!doc/Studio for more information.
@@ -39,12 +39,25 @@
 
 /********* You can start writing your CSS below this line: **********/
 
+#gfe-game-area {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.gfe-player-board {
+  max-width: 100%;
+}
+
 .gfe-sheet {
   position: relative;
-  width: 900px;
+  width: min(900px, 100%);
+  height: auto;
   aspect-ratio: 3509 / 2488;
   background-image: url("img/berlin_map.jpg");
   background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
   margin: 0 auto;
 }
 

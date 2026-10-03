@@ -1,4 +1,9 @@
 <?php
+// BGA framework: Gregory Isabelli & Emmanuel Colin & BoardGameArena
+// GreetingsFromEarth implementation : © Marco Baaß <picture@marcobaass.com>
+// This code has been produced on the BGA studio platform for use on http://boardgamearena.com.
+// See http://en.boardgamearena.com/#!doc/Studio for more information.
+
 declare(strict_types=1);
 
 namespace Bga\Games\GreetingsFromEarth;
@@ -195,9 +200,7 @@ class Game extends \Bga\GameFramework\Table {
             return true;
         }
 
-        $coveredRows = $this->getObjectListFromDB(
-            "SELECT `x`, `y` FROM `player_cells` WHERE `player_id` = '$playerId'"
-        );
+        $coveredRows = $this->getObjectListFromDB("SELECT `x`, `y` FROM `player_cells` WHERE `player_id` = '$playerId'");
         $covered = [];
         foreach ($coveredRows as $row) {
             $covered[cellKey((int) $row["x"], (int) $row["y"])] = true;
@@ -225,13 +228,7 @@ class Game extends \Bga\GameFramework\Table {
      * @param list<array{0: int|float, 1: int|float}> $lastCells
      * @param array<string, bool> $memo
      */
-    private function canSurviveRemainingRoundsWithI1(
-        int $depth,
-        array $covered,
-        bool $hasStarted,
-        array $lastCells,
-        array &$memo
-    ): bool {
+    private function canSurviveRemainingRoundsWithI1(int $depth, array $covered, bool $hasStarted, array $lastCells, array &$memo): bool {
         if ($depth <= 0) {
             return true;
         }
@@ -337,7 +334,7 @@ class Game extends \Bga\GameFramework\Table {
         $cells = getShapeCells($tileType, $x, $y, $rotation, $mirror);
 
         if (count($cells) === 0) {
-            throw new UserException("Invalid tile type");
+            throw new UserException(clienttranslate("Invalid tile type"));
         }
         // validate placement
         if (!$this->isValidPlacement($playerId, $tileType, $x, $y, $rotation, $mirror)) {
@@ -387,7 +384,7 @@ class Game extends \Bga\GameFramework\Table {
         $cells = getShapeCells($tileType, $x, $y, $rotation, $mirror);
 
         if (count($cells) === 0) {
-            throw new UserException("Invalid tile type");
+            throw new UserException(clienttranslate("Invalid tile type"));
         }
 
         // validate placement
@@ -599,7 +596,7 @@ class Game extends \Bga\GameFramework\Table {
         if (!in_array($tileType, ALWAYS_AVAILABLE_TILES, true)) {
             $index = array_search($tileType, $tiles, true);
             if ($index === false) {
-                throw new UserException("Tile type not found in pending bonus tiles");
+                throw new UserException(clienttranslate("Tile type not found in pending bonus tiles"));
             }
             array_splice($tiles, $index, 1);
         }
@@ -985,7 +982,7 @@ class Game extends \Bga\GameFramework\Table {
         // notify all players
         $this->notify->all(
             "turnFinalized",
-            clienttranslate('${player_name} ends their turn'),
+            clienttranslate('${player_name} ends the turn'),
             array_merge(
                 [
                     "player_id" => $playerId,

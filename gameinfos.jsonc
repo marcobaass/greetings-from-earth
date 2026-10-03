@@ -3,74 +3,74 @@
  *
  * See documentation about this file here:
  * http://en.doc.boardgamearena.com/Game_meta-information:_gameinfos.inc.php
-*/
+ */
 {
-    // Name of the game in English (will serve as the basis for translation)
-    "game_name": "Greetings from Earth",
+  // Name of the game in English (will serve as the basis for translation)
+  "game_name": "Greetings from Earth",
 
-    // Game publisher (use empty string if there is no publisher)
-    "publisher": "Sloppy Games",
+  // Game publisher (use empty string if there is no publisher)
+  "publisher": "Sloppy Games",
 
-    // Url of game publisher website
-    "publisher_website": "https://sloppygames.de/",
+  // Url of game publisher website
+  "publisher_website": "https://sloppygames.de/",
 
-    // Board Game Geek ID of the publisher
-    // TODO: Add the BGG ID for publishers when available
-    "publisher_bgg_id": 63077,
+  // Board Game Geek ID of the publisher
+  // TODO: Add the BGG ID for publishers when available
+  "publisher_bgg_id": 63077,
 
-    // Board game geek ID of the game
-    // TODO: Add the BGG ID for the game when available
-    "bgg_id": 471861,
+  // Board game geek ID of the game
+  // TODO: Add the BGG ID for the game when available
+  "bgg_id": 471861,
 
-    // Designer(s)
-    "game_designer": "Benno Thönelt, Marco Baaß",
-    "game_artist": "Benno Thönelt, Marco Baaß",
+  // Designer(s)
+  "game_designer": "Benno Thönelt, Marco Baaß",
+  "game_artist": "Benno Thönelt, Marco Baaß",
 
-    // Player count — 1 to 99 as per your game
-    "players": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-    "suggest_player_number": 4,
-    "not_recommend_player_number": [],
+  // Player count — 1 to 99 as per your game
+  "players": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+  "suggest_player_number": 4,
+  "not_recommend_player_number": [],
 
-    // Game duration in minutes (rough estimates — BGA adjusts after release)
-    "estimated_duration": 30,
-    "fast_additional_time": 30,
-    "medium_additional_time": 40,
-    "slow_additional_time": 60,
+  // Game duration in minutes (rough estimates — BGA adjusts after release)
+  "estimated_duration": 30,
+  "fast_additional_time": 30,
+  "medium_additional_time": 40,
+  "slow_additional_time": 60,
 
-    // Simultaneous turns — important for your game!
-    "is_simultaneous": true,
+  // Simultaneous turns — important for your game!
+  "is_simultaneous": true,
 
-    // Not a coop game
-    "coop": 0,
+  // Not a coop game
+  "coop": 0,
 
-    // Tie breaker — total cells covered on player sheet
-    "tie_breaker_description": "In case of a tie, the player who covered more cells on their map wins. If still tied, players share the position.",
-    "losers_not_ranked": false,
+  // Tie breaker — total cells covered on player sheet
+  "tie_breaker_description": "In case of a tie, the player who scored more points through monuments and collection balls wins. If still tied, the player wins who covered more cells on their map. After that, players share the position.",
+  "losers_not_ranked": false,
 
-    // Language dependency — no text on tiles, so low dependency
-    "language_dependency": false,
+  // Language dependency — no text on tiles, so low dependency
+  "language_dependency": false,
 
-    // Minimum screen size recommendation
-    "game_interface_width": { "min": 740, "max": null },
+  // Minimum screen size recommendation
+  "game_interface_width": { "min": 740, "max": 980 },
 
-    // 12 colors for up to 12 players
-    "player_colors": [
-        "ff0000", // red
-        "008000", // green
-        "0000ff", // blue
-        "ffa500", // orange
-        "ff69b4", // pink
-        "800080", // purple
-        "00ced1", // teal
-        "ffff00", // yellow
-        "a52a2a", // brown
-        "808080", // gray
-        "00ff7f", // spring green
-        "4169e1"  // royal blue
-    ],
+  // 12 colors for up to 12 players
+  "player_colors": [
+    "ff0000", // red
+    "008000", // green
+    "0000ff", // blue
+    "ffa500", // orange
+    "ff69b4", // pink
+    "800080", // purple
+    "00ced1", // teal
+    "ffff00", // yellow
+    "a52a2a", // brown
+    "808080", // gray
+    "00ff7f", // spring green
+    "4169e1" // royal blue
+  ],
 
-    // Solo mode — single player can play and be ranked
-    "solo_mode_ranked": true,
+  // Solo mode — single player can play and be ranked
+  "solo_mode_ranked": true,
 
-    "exception_on_warning": true
+  "exception_on_warning": true
 }

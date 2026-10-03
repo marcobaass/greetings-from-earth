@@ -1,4 +1,8 @@
 <?php
+// BGA framework: Gregory Isabelli & Emmanuel Colin & BoardGameArena
+// GreetingsFromEarth implementation : © Marco Baaß <picture@marcobaass.com>
+// This code has been produced on the BGA studio platform for use on http://boardgamearena.com.
+// See http://en.boardgamearena.com/#!doc/Studio for more information.
 
 declare(strict_types=1);
 
@@ -28,6 +32,10 @@ class EndScore extends \Bga\GameFramework\States\GameState {
             $this->playerStats->set("mustsee_score", (int) $row["mustsee_score"], $player_id);
             $this->playerStats->set("ufo_score", (int) $row["ufo_score"], $player_id);
             $this->playerStats->set("street_art_score", (int) $row["street_art_score"], $player_id);
+
+            $monumentCollection = (int) $row["monument_collection_score"];
+            $cellsCovered = (int) $this->game->getUniqueValueFromDB("SELECT COUNT(*) FROM player_cells WHERE player_id = $player_id");
+            $this->playerScoreAux->set($player_id, $monumentCollection * 1000 + $cellsCovered);
         }
 
         return ST_END_GAME;

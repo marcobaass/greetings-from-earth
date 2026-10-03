@@ -1,4 +1,8 @@
 <?php
+// BGA framework: Gregory Isabelli & Emmanuel Colin & BoardGameArena
+// GreetingsFromEarth implementation : © Marco Baaß <picture@marcobaass.com>
+// This code has been produced on the BGA studio platform for use on http://boardgamearena.com.
+// See http://en.boardgamearena.com/#!doc/Studio for more information.
 
 declare(strict_types=1);
 
@@ -33,7 +37,7 @@ class PlaceBonus extends GameState {
 
     #[PossibleAction]
     public function actPlaceBonusTile(int $currentPlayerId, string $tileType, int $x, int $y, int $rotation, bool $mirror): string|null {
-        throw new UserException("Use PlaceTile bonus flow");
+        throw new UserException(clienttranslate("Use PlaceTile bonus flow"));
     }
 
     public function onEnteringState() {
