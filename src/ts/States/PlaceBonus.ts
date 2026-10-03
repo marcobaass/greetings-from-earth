@@ -63,42 +63,6 @@ export class PlaceBonus {
         this.showPreview(grid, tile, 0, 0);
       });
     });
-
-    this.bga.statusBar.addActionButton("↻", () => {
-      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-
-      this.rotation = (this.rotation + 90) % 360;
-      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-    });
-
-    this.bga.statusBar.addActionButton("↺", () => {
-      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-
-      this.rotation = (this.rotation + 270) % 360;
-      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-    });
-
-    this.bga.statusBar.addActionButton("↔", () => {
-      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-      this.mirror = !this.mirror;
-      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-    });
-
-    if (legal && this.tileSelected) {
-      this.bga.statusBar.addActionButton("✔", () => {
-        if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-        const cells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
-        if (!isPlacementLegal(cells, this.bga.gameui.gamedatas)) return;
-
-        this.bga.actions.performAction("actPlaceBonusTile", {
-          tileType: this.tileSelected,
-          x: this.anchorX,
-          y: this.anchorY,
-          rotation: this.rotation,
-          mirror: this.mirror
-        });
-      });
-    }
   }
 
   private resetPlacementState() {

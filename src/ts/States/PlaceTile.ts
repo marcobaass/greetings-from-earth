@@ -17,19 +17,41 @@ export class PlaceTile {
   private followingMouse = false;
 
   private onGridClick = (event: MouseEvent) => {
-    this.followingMouse = false;
     const cell = event.target as HTMLElement;
     if (!this.tileSelected) return;
     if (!(cell instanceof HTMLElement) || !cell.classList.contains("gfe-cell")) return;
+
     const playerId = this.bga.players.getCurrentPlayerId();
     const grid = document.getElementById(`gfe-play-grid-${playerId}`);
     if (!grid) return;
-    this.anchorX = Number(cell.dataset.x);
-    this.anchorY = Number(cell.dataset.y);
 
-    if (isNaN(this.anchorX) || isNaN(this.anchorY)) return;
+    let x = Number(cell.dataset.x);
+    let y = Number(cell.dataset.y);
+    if (isNaN(x) || isNaN(y)) return;
 
-    this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+    // Pinned: click the current shape to pick up and drag again
+    if (!this.followingMouse && this.anchorX != null && this.anchorY != null) {
+      const pinnedCells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
+      if (pinnedCells.some(([cx, cy]) => cx === x && cy === y)) {
+        this.followingMouse = true;
+        this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        return;
+      }
+    }
+
+    // Pin / re-anchor at clicked cell (allowed even if illegal — ✔ stays gated)
+    let cells = getShapeCells(this.tileSelected, x, y, this.rotation, this.mirror);
+    if (!isInsideGrid(cells)) {
+      const [shiftX, shiftY] = computeTileShift(cells);
+      x += shiftX;
+      y += shiftY;
+      cells = getShapeCells(this.tileSelected, x, y, this.rotation, this.mirror);
+    }
+
+    this.followingMouse = false;
+    this.anchorX = x;
+    this.anchorY = y;
+    this.showPreview(grid, this.tileSelected, x, y);
   };
 
   private onMouseMove = (event: MouseEvent) => {
@@ -154,7 +176,8 @@ export class PlaceTile {
   private showPreview(grid: HTMLElement, tileType: string, anchorX: number, anchorY: number) {
     let cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
 
-    if (!isInsideGrid(cells)) {
+    // Only nudge onto the board while dragging; pinned rotate/mirror must not jump
+    if (!isInsideGrid(cells) && this.followingMouse) {
       const [shiftX, shiftY] = computeTileShift(cells);
       anchorX += shiftX;
       anchorY += shiftY;
@@ -244,8 +267,6 @@ export class PlaceTile {
   }
 
   private addButtonsForTile(cells: [number, number][], legal: boolean, grid: HTMLElement) {
-    if (this.followingMouse) return;
-
     // calculating center origin of the tile
     const xs = cells.map(([x]) => x);
     const ys = cells.map(([, y]) => y);
@@ -265,6 +286,7 @@ export class PlaceTile {
     const mirrorButton = document.createElement("button");
     mirrorButton.className = "gfe-tile-button";
     mirrorButton.textContent = "↔";
+    mirrorButton.title = _("Mirror");
     mirrorButton.addEventListener("click", (e) => {
       e.stopPropagation();
       if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
@@ -278,6 +300,7 @@ export class PlaceTile {
     const rotateLeftButton = document.createElement("button");
     rotateLeftButton.className = "gfe-tile-button";
     rotateLeftButton.textContent = "↻";
+    rotateLeftButton.title = _("Rotate");
     rotateLeftButton.addEventListener("click", (e) => {
       e.stopPropagation();
       if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
@@ -291,6 +314,7 @@ export class PlaceTile {
     const rotateRightButton = document.createElement("button");
     rotateRightButton.className = "gfe-tile-button";
     rotateRightButton.textContent = "↺";
+    rotateRightButton.title = _("Rotate");
     rotateRightButton.addEventListener("click", (e) => {
       e.stopPropagation();
       if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
@@ -300,6 +324,22 @@ export class PlaceTile {
     rotateRightButton.style.left = `${leftPct + gapH}%`;
     rotateRightButton.style.top = `${topPct}%`;
     grid.appendChild(rotateRightButton);
+
+    if (!this.followingMouse) {
+      const moveButton = document.createElement("button");
+      moveButton.className = "gfe-tile-button";
+      moveButton.textContent = "✥";
+      moveButton.title = _("Pick up and move");
+      moveButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
+        this.followingMouse = true;
+        this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+      });
+      moveButton.style.left = `${leftPct - gapH}%`;
+      moveButton.style.top = `${topPct + gapV}%`;
+      grid.appendChild(moveButton);
+    }
 
     const confirmButton = document.createElement("button");
     confirmButton.className = "gfe-tile-button";
@@ -364,44 +404,6 @@ export class PlaceTile {
         { color: "secondary" }
       );
     });
-
-    this.bga.statusBar.addActionButton("↻", () => {
-      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-
-      this.rotation = (this.rotation + 90) % 360;
-      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-    });
-
-    this.bga.statusBar.addActionButton("↺", () => {
-      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-
-      this.rotation = (this.rotation + 270) % 360;
-      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-    });
-
-    this.bga.statusBar.addActionButton("↔", () => {
-      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-      this.mirror = !this.mirror;
-      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-    });
-
-    if (legal && this.tileSelected) {
-      this.bga.statusBar.addActionButton(_("Confirm placement"), () => {
-        if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-        const cells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
-        if (!isPlacementLegal(cells, this.bga.gameui.gamedatas)) return;
-
-        const action = this.pendingTiles.length > 0 ? "actPlaceBonusTile" : "actPlaceTile";
-
-        this.bga.actions.performAction(action, {
-          tileType: this.tileSelected,
-          x: this.anchorX,
-          y: this.anchorY,
-          rotation: this.rotation,
-          mirror: this.mirror
-        });
-      });
-    }
 
     this.addUndoButtonIfPossible();
   }
@@ -503,7 +505,6 @@ export class PlaceTile {
     }
 
     this.bga.statusBar.removeActionButtons();
-    this.addUndoButtonIfPossible();
     const canSurvive = this.canSurviveRemaining ?? canI1BePlaced(this.bga.gameui.gamedatas);
     if (canSurvive) {
       this.bga.statusBar.setTitle(this.canUndo ? _("${you} may undo or end your turn") : _("${you} must end your turn"));
@@ -513,6 +514,7 @@ export class PlaceTile {
     } else {
       this.bga.statusBar.setTitle(_("${you} cannot reach the end of the game with this placement — please undo"));
     }
+    this.addUndoButtonIfPossible();
   }
 
   constructor(
