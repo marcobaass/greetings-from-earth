@@ -40,6 +40,7 @@ interface PlaceTileArgs {
   diceRoll: number;
   tileOptions: string[];
   alwaysAvailableTiles: string[];
+  hasLegalI1MoveByPlayer: Record<string, boolean>;
 }
 
 interface PlaceBonusArgs {
@@ -69,6 +70,7 @@ interface NotifTilePlacedArgs {
   monument_score: number;
   monument_collection_score: number;
   street_art_score: number;
+  has_legal_i1_move?: boolean;
 }
 
 interface NotifNewRoundArgs {
@@ -126,6 +128,7 @@ interface NotifStreetArtChosenArgs {
   pending_tiles: string[];
   awaiting_turn_confirm?: boolean;
   can_survive_remaining?: boolean;
+  has_legal_i1_move?: boolean;
 }
 
 interface NotifTurnUndoneArgs {

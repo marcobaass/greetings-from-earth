@@ -463,10 +463,15 @@ export class Game {
     streetArtPending: number,
     pendingTiles: string[],
     awaitingTurnConfirm: boolean = false,
-    canSurviveRemaining?: boolean
+    canSurviveRemaining?: boolean,
+    hasLegalI1Move?: boolean
   ) {
     const myId = this.bga.players.getCurrentPlayerId();
     if (Number(playerId) !== Number(myId)) return;
+
+    if (hasLegalI1Move !== undefined) {
+      this.placeTile.setHasLegalI1Move(hasLegalI1Move);
+    }
 
     const ps = this.bga.gameui.gamedatas.playerState;
     ps.pending_bonus_tiles = JSON.stringify(pendingTiles);
@@ -582,7 +587,8 @@ export class Game {
       args.street_art_pending ?? 0,
       args.pending_tiles ?? [],
       !!args.awaiting_turn_confirm,
-      args.can_survive_remaining
+      args.can_survive_remaining,
+      args.has_legal_i1_move
     );
   }
 
@@ -619,7 +625,8 @@ export class Game {
       args.street_art_pending ?? 0,
       args.pending_tiles ?? [],
       !!args.awaiting_turn_confirm,
-      args.can_survive_remaining
+      args.can_survive_remaining,
+      args.has_legal_i1_move
     );
   }
 
@@ -648,7 +655,8 @@ export class Game {
       args.street_art_pending ?? 0,
       args.pending_tiles ?? [],
       !!args.awaiting_turn_confirm,
-      args.can_survive_remaining
+      args.can_survive_remaining,
+      args.has_legal_i1_move
     );
   }
 

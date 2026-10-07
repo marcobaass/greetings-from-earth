@@ -345,6 +345,32 @@ class Game extends \Bga\GameFramework\Table {
         return $depth . "|" . ($hasStarted ? "1" : "0") . "|" . implode(";", $lastKeys) . "|" . implode(";", $coverKeys);
     }
 
+    /**
+     * True if at least one legal I1 exists on the current board
+     * (adjacent to S-Bahn or last placed tile).
+     */
+    public function hasLegalI1Move(int $playerId): bool {
+        $coveredRows = $this->getObjectListFromDB("SELECT `x`, `y` FROM `player_cells` WHERE `player_id` = '$playerId'");
+        $covered = [];
+        foreach ($coveredRows as $row) {
+            $covered[cellKey((int) $row["x"], (int) $row["y"])] = true;
+        }
+
+        $playerState = $this->getObjectFromDB("SELECT * FROM `player_state` WHERE `player_id` = '$playerId'");
+        $hasStarted = (int) $playerState["has_started"] !== 0;
+        $lastCells = [];
+        if ($hasStarted && $playerState["last_tile_type"] !== null) {
+            $lastCells = getShapeCells(
+                $playerState["last_tile_type"],
+                (int) $playerState["last_x"],
+                (int) $playerState["last_y"],
+                (int) $playerState["last_rotation"],
+                ((int) $playerState["last_mirror"]) === 1
+            );
+        }
+        return count($this->collectLegalI1Moves($covered, $hasStarted, $lastCells)) > 0;
+    }
+
     // ===== TILE PLACEMENT =====
 
     public function placeTile(int $playerId, string $tileType, int $x, int $y, int $rotation, bool $mirror): void {
@@ -637,6 +663,13 @@ class Game extends \Bga\GameFramework\Table {
         $this->setPendingBonusState($playerId, [], 0);
     }
 
+    public function clearTurnPlacementFlags(int $playerId): void {
+        static::DbQuery(
+            "UPDATE `player_state` SET `street_art_pending` = 0, `cells_this_turn` = '[]'
+         WHERE `player_id` = '$playerId'"
+        );
+    }
+
     public function finishPlacementOrWait(int $playerId): bool {
         // true = nothing left to place (player should End turn or Undo)
         if ($this->hasPendingStreetArt($playerId)) {
@@ -673,6 +706,16 @@ class Game extends \Bga\GameFramework\Table {
         static::DbQuery("UPDATE `player_state` SET `turn_ended` = $value WHERE `player_id` = '$playerId'");
     }
 
+    public function hasJourneyEnded(int $playerId): bool {
+        $state = $this->getObjectFromDb("SELECT `journey_ended` FROM `player_state` WHERE `player_id` = '$playerId'");
+        return (int) ($state["journey_ended"] ?? 0) === 1;
+    }
+
+    public function setJourneyEnded(int $playerId, bool $ended): void {
+        $value = $ended ? 1 : 0;
+        static::DbQuery("UPDATE `player_state` SET `journey_ended` = $value WHERE `player_id` = '$playerId'");
+    }
+
     /**
      * Players who still must act this round (place and/or press End turn).
      */
@@ -680,8 +723,12 @@ class Game extends \Bga\GameFramework\Table {
         $players = $this->loadPlayersBasicInfos();
         $ids = [];
         foreach (array_keys($players) as $playerId) {
-            if (!$this->hasTurnEnded((int) $playerId)) {
-                $ids[] = (int) $playerId;
+            $pid = (int) $playerId;
+            if ($this->hasJourneyEnded($pid)) {
+                continue;
+            }
+            if (!$this->hasTurnEnded($pid)) {
+                $ids[] = $pid;
             }
         }
         return $ids;
@@ -713,6 +760,7 @@ class Game extends \Bga\GameFramework\Table {
             "street_art_pending" => (int) $state["street_art_pending"],
             "street_art_completed" => json_decode($state["street_art_completed"] ?? "[]", true) ?? [],
             "can_survive_remaining" => $this->canI1BePlaced($playerId),
+            "has_legal_i1_move" => $this->hasLegalI1Move($playerId),
         ];
     }
 

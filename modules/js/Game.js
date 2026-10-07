@@ -616,6 +616,10 @@ class PlaceTile {
     }
     showBonusButtons(pendingTiles) {
         this.pendingTiles = pendingTiles;
+        if (this.isStuckWithNoLegalI1()) {
+            this.showEndJourneyUi();
+            return;
+        }
         this.resetPlacementState();
         const playerId = this.bga.players.getCurrentPlayerId();
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
@@ -663,6 +667,21 @@ class PlaceTile {
     /**
      * Placement finished — only Undo or End turn (does not advance round by itself).
      */
+    isStuckWithNoLegalI1() {
+        if (!this.placeTileArgs?.hasLegalI1MoveByPlayer)
+            return false;
+        const myId = this.bga.players.getCurrentPlayerId();
+        const map = this.placeTileArgs.hasLegalI1MoveByPlayer;
+        const value = map[String(myId)] ?? map[myId];
+        return value === false;
+    }
+    showEndJourneyUi() {
+        this.bga.statusBar.removeActionButtons();
+        this.bga.statusBar.setTitle(_("No legal placement left — your journey ends here"));
+        this.bga.statusBar.addActionButton(_("End journey"), () => {
+            this.bga.actions.performAction("actEndJourney", {});
+        });
+    }
     showConfirmEndTurn() {
         this.clearPendingTiles();
         this.resetPlacementState();
@@ -681,16 +700,16 @@ class PlaceTile {
             streetArtGrid.removeEventListener("click", this.onStreetArtClick);
         }
         this.bga.statusBar.removeActionButtons();
-        const canSurvive = this.canSurviveRemaining ?? canI1BePlaced(this.bga.gameui.gamedatas);
-        if (canSurvive) {
-            this.bga.statusBar.setTitle(this.canUndo ? _("${you} may undo or end your turn") : _("${you} must end your turn"));
-            this.bga.statusBar.addActionButton(_("End turn"), () => {
-                this.bga.actions.performAction("actEndTurn", {});
-            });
-        }
-        else {
-            this.bga.statusBar.setTitle(_("${you} cannot reach the end of the game with this placement — please undo"));
-        }
+        // Forecast disabled — always allow End turn; End journey handles no-I1.
+        // const canSurvive = this.canSurviveRemaining ?? canI1BePlaced(this.bga.gameui.gamedatas);
+        // if (canSurvive) {
+        this.bga.statusBar.setTitle(this.canUndo ? _("${you} may undo or end your turn") : _("${you} must end your turn"));
+        this.bga.statusBar.addActionButton(_("End turn"), () => {
+            this.bga.actions.performAction("actEndTurn", {});
+        });
+        // } else {
+        //   this.bga.statusBar.setTitle(_("${you} cannot reach the end of the game with this placement — please undo"));
+        // }
         this.addUndoButtonIfPossible();
     }
     constructor(game, bga) {
@@ -782,6 +801,10 @@ class PlaceTile {
     }
     onEnteringState(args, isCurrentPlayerActive) {
         this.placeTileArgs = args;
+        if (isCurrentPlayerActive && this.isStuckWithNoLegalI1()) {
+            this.showEndJourneyUi();
+            return;
+        }
         // After refresh: only allow Undo if this turn already has changes
         if (!this.canUndo) {
             const ps = this.bga.gameui.gamedatas.playerState;
@@ -845,6 +868,15 @@ class PlaceTile {
     }
     setCanSurviveRemaining(value) {
         this.canSurviveRemaining = value;
+    }
+    setHasLegalI1Move(value) {
+        if (!this.placeTileArgs)
+            return;
+        const myId = this.bga.players.getCurrentPlayerId();
+        this.placeTileArgs.hasLegalI1MoveByPlayer = {
+            ...this.placeTileArgs.hasLegalI1MoveByPlayer,
+            [String(myId)]: !!value
+        };
     }
     clearCanSurviveRemaining() {
         this.canSurviveRemaining = null;
@@ -1299,10 +1331,13 @@ class Game {
             mirror: Number(p.mirror)
         }));
     }
-    continueAfterPlacement(playerId, streetArtPending, pendingTiles, awaitingTurnConfirm = false, canSurviveRemaining) {
+    continueAfterPlacement(playerId, streetArtPending, pendingTiles, awaitingTurnConfirm = false, canSurviveRemaining, hasLegalI1Move) {
         const myId = this.bga.players.getCurrentPlayerId();
         if (Number(playerId) !== Number(myId))
             return;
+        if (hasLegalI1Move !== undefined) {
+            this.placeTile.setHasLegalI1Move(hasLegalI1Move);
+        }
         const ps = this.bga.gameui.gamedatas.playerState;
         ps.pending_bonus_tiles = JSON.stringify(pendingTiles);
         ps.street_art_pending = streetArtPending;
@@ -1371,7 +1406,7 @@ class Game {
         gamedatas.playerState.last_rotation = args.rotation;
         gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
         this.applyBoardScoringFromNotif(args);
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm, args.can_survive_remaining);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm, args.can_survive_remaining, args.has_legal_i1_move);
     }
     async notif_bonusTilePlaced(args) {
         const myId = this.bga.players.getCurrentPlayerId();
@@ -1396,7 +1431,7 @@ class Game {
         gamedatas.playerState.last_rotation = args.rotation;
         gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
         this.applyBoardScoringFromNotif(args);
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm, args.can_survive_remaining);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm, args.can_survive_remaining, args.has_legal_i1_move);
     }
     async notif_streetArtChosen(args) {
         const myId = this.bga.players.getCurrentPlayerId();
@@ -1407,7 +1442,7 @@ class Game {
         this.bga.gameui.gamedatas.playerState.street_art_score = args.street_art_score;
         this.renderMustSeeUfoTrack(args.player_id, ps.ufo_count, mustsee.length, ps.mustsee_score, ps.ufo_score, ps.monument_collection_score, ps.street_art_score);
         this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
-        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm, args.can_survive_remaining);
+        this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm, args.can_survive_remaining, args.has_legal_i1_move);
     }
     async notif_turnFinalized(args) {
         const myId = this.bga.players.getCurrentPlayerId();

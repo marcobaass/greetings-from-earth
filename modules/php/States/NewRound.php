@@ -51,10 +51,23 @@ class NewRound extends \Bga\GameFramework\States\GameState {
             "playerBoards" => $playerBoards,
         ]);
 
-        $this->gamestate->setAllPlayersMultiactive();
+        $activeIds = [];
+        foreach (array_keys($players) as $playerId) {
+            $pid = (int) $playerId;
+            if (!$this->game->hasJourneyEnded($pid)) {
+                $activeIds[] = $pid;
+            }
+        }
+        if (count($activeIds) === 0) {
+            return EndScore::class;
+        }
+        $this->gamestate->setPlayersMultiactive($activeIds, EndScore::class, true);
 
         foreach (array_keys($players) as $playerId) {
-            $this->game->giveExtraTime((int) $playerId);
+            $pid = (int) $playerId;
+            if (!$this->game->hasJourneyEnded($pid)) {
+                $this->game->giveExtraTime($pid);
+            }
         }
 
         return PlaceTile::class;

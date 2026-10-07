@@ -30,10 +30,17 @@ class PlaceTile extends GameState {
         $diceRoll = (int) $this->game->getGameStateValue("dice_roll");
         $tileOptions = Game::DICE_WHEEL[$diceRoll];
 
+        $hasLegalI1MoveByPlayer = [];
+        foreach (array_keys($this->game->loadPlayersBasicInfos()) as $playerId) {
+            $pid = (int) $playerId;
+            $hasLegalI1MoveByPlayer[$pid] = $this->game->hasLegalI1Move($pid);
+        }
+
         return [
             "diceRoll" => $diceRoll,
             "tileOptions" => $tileOptions,
             "alwaysAvailableTiles" => ALWAYS_AVAILABLE_TILES,
+            "hasLegalI1MoveByPlayer" => $hasLegalI1MoveByPlayer,
         ];
     }
 
@@ -76,6 +83,7 @@ class PlaceTile extends GameState {
                     "street_art_completed" => $status["street_art_completed"],
                     "awaiting_turn_confirm" => $status["awaiting_turn_confirm"],
                     "can_survive_remaining" => $status["can_survive_remaining"],
+                    "has_legal_i1_move" => $status["has_legal_i1_move"] ? 1 : 0,
                 ],
                 $scoring
             )
@@ -144,13 +152,13 @@ class PlaceTile extends GameState {
             throw new UserException(clienttranslate("You must place a tile before ending your turn"));
         }
 
-        if (!$this->game->canI1BePlaced($currentPlayerId)) {
-            throw new UserException(
-                clienttranslate(
-                    "This placement cannot reach the end of the game with 1-square tiles. Please undo and choose a different placement."
-                )
-            );
-        }
+        // if (!$this->game->canI1BePlaced($currentPlayerId)) {
+        //     throw new UserException(
+        //         clienttranslate(
+        //             "This placement cannot reach the end of the game with 1-square tiles. Please undo and choose a different placement."
+        //         )
+        //     );
+        // }
 
         $this->game->finalizeTurn($currentPlayerId);
         $this->game->setTurnEnded($currentPlayerId, true);
@@ -161,6 +169,36 @@ class PlaceTile extends GameState {
         ]);
 
         // Remove only this player from active list. NewRound runs only if nobody left.
+        $this->gamestate->setPlayerNonMultiactive($currentPlayerId, NewRound::class);
+        return null;
+    }
+
+    /**
+     * Player has no legal I1 left — retire for remaining rounds; others continue.
+     */
+    #[PossibleAction]
+    public function actEndJourney(int $currentPlayerId): string|null {
+        if ($this->game->hasJourneyEnded($currentPlayerId)) {
+            throw new UserException(clienttranslate("Your journey has already ended"));
+        }
+        if ($this->game->hasTurnEnded($currentPlayerId)) {
+            throw new UserException(clienttranslate("You already ended your turn"));
+        }
+        if ($this->game->hasLegalI1Move($currentPlayerId)) {
+            throw new UserException(clienttranslate("You still have a legal placement"));
+        }
+
+        $this->game->clearPendingBonusTiles($currentPlayerId);
+        $this->game->clearTurnPlacementFlags($currentPlayerId);
+
+        $this->game->setJourneyEnded($currentPlayerId, true);
+        $this->game->setTurnEnded($currentPlayerId, true);
+
+        $this->notify->all("journeyEnded", clienttranslate('${player_name} has no legal placement left and ends their journey'), [
+            "player_id" => $currentPlayerId,
+            "player_name" => $this->game->getPlayerNameById($currentPlayerId),
+        ]);
+
         $this->gamestate->setPlayerNonMultiactive($currentPlayerId, NewRound::class);
         return null;
     }
@@ -198,6 +236,7 @@ class PlaceTile extends GameState {
                     "street_art_completed" => $status["street_art_completed"],
                     "awaiting_turn_confirm" => $status["awaiting_turn_confirm"],
                     "can_survive_remaining" => $status["can_survive_remaining"],
+                    "has_legal_i1_move" => $status["has_legal_i1_move"] ? 1 : 0,
                 ],
                 $scoring
             )
@@ -236,6 +275,7 @@ class PlaceTile extends GameState {
             "pending_tiles" => $status["pending_tiles"],
             "awaiting_turn_confirm" => $status["awaiting_turn_confirm"],
             "can_survive_remaining" => $status["can_survive_remaining"],
+            "has_legal_i1_move" => $status["has_legal_i1_move"] ? 1 : 0,
         ]);
 
         $this->game->keepPlayersInRoundActive(NewRound::class);

@@ -425,6 +425,12 @@ export class PlaceTile {
 
   public showBonusButtons(pendingTiles: string[]) {
     this.pendingTiles = pendingTiles;
+
+    if (this.isStuckWithNoLegalI1()) {
+      this.showEndJourneyUi();
+      return;
+    }
+
     this.resetPlacementState();
 
     const playerId = this.bga.players.getCurrentPlayerId();
@@ -483,6 +489,22 @@ export class PlaceTile {
   /**
    * Placement finished — only Undo or End turn (does not advance round by itself).
    */
+  private isStuckWithNoLegalI1(): boolean {
+    if (!this.placeTileArgs?.hasLegalI1MoveByPlayer) return false;
+    const myId = this.bga.players.getCurrentPlayerId();
+    const map = this.placeTileArgs.hasLegalI1MoveByPlayer;
+    const value = map[String(myId)] ?? map[myId as unknown as string];
+    return value === false;
+  }
+
+  private showEndJourneyUi() {
+    this.bga.statusBar.removeActionButtons();
+    this.bga.statusBar.setTitle(_("No legal placement left — your journey ends here"));
+    this.bga.statusBar.addActionButton(_("End journey"), () => {
+      this.bga.actions.performAction("actEndJourney", {});
+    });
+  }
+
   public showConfirmEndTurn() {
     this.clearPendingTiles();
     this.resetPlacementState();
@@ -505,15 +527,16 @@ export class PlaceTile {
     }
 
     this.bga.statusBar.removeActionButtons();
-    const canSurvive = this.canSurviveRemaining ?? canI1BePlaced(this.bga.gameui.gamedatas);
-    if (canSurvive) {
-      this.bga.statusBar.setTitle(this.canUndo ? _("${you} may undo or end your turn") : _("${you} must end your turn"));
-      this.bga.statusBar.addActionButton(_("End turn"), () => {
-        this.bga.actions.performAction("actEndTurn", {});
-      });
-    } else {
-      this.bga.statusBar.setTitle(_("${you} cannot reach the end of the game with this placement — please undo"));
-    }
+    // Forecast disabled — always allow End turn; End journey handles no-I1.
+    // const canSurvive = this.canSurviveRemaining ?? canI1BePlaced(this.bga.gameui.gamedatas);
+    // if (canSurvive) {
+    this.bga.statusBar.setTitle(this.canUndo ? _("${you} may undo or end your turn") : _("${you} must end your turn"));
+    this.bga.statusBar.addActionButton(_("End turn"), () => {
+      this.bga.actions.performAction("actEndTurn", {});
+    });
+    // } else {
+    //   this.bga.statusBar.setTitle(_("${you} cannot reach the end of the game with this placement — please undo"));
+    // }
     this.addUndoButtonIfPossible();
   }
 
@@ -524,6 +547,11 @@ export class PlaceTile {
 
   onEnteringState(args: PlaceTileArgs, isCurrentPlayerActive: boolean) {
     this.placeTileArgs = args;
+
+    if (isCurrentPlayerActive && this.isStuckWithNoLegalI1()) {
+      this.showEndJourneyUi();
+      return;
+    }
 
     // After refresh: only allow Undo if this turn already has changes
     if (!this.canUndo) {
@@ -602,6 +630,15 @@ export class PlaceTile {
 
   public setCanSurviveRemaining(value: boolean) {
     this.canSurviveRemaining = value;
+  }
+
+  public setHasLegalI1Move(value: boolean | number) {
+    if (!this.placeTileArgs) return;
+    const myId = this.bga.players.getCurrentPlayerId();
+    this.placeTileArgs.hasLegalI1MoveByPlayer = {
+      ...this.placeTileArgs.hasLegalI1MoveByPlayer,
+      [String(myId)]: !!value
+    };
   }
 
   public clearCanSurviveRemaining() {

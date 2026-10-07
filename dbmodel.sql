@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS `player_state` (
     `cells_this_turn`        VARCHAR(512)    NOT NULL DEFAULT '[]',
     `turn_snapshot` TEXT NOT NULL,
     `turn_ended`             TINYINT(1)      NOT NULL DEFAULT 0,
+    `journey_ended`          TINYINT(1)      NOT NULL DEFAULT 0,
     PRIMARY KEY (`player_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
