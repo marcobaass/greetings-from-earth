@@ -153,7 +153,6 @@ class PlaceTile extends GameState {
         }
 
         $this->game->finalizeTurn($currentPlayerId);
-        $this->game->invalidateTurnUndo($currentPlayerId);
         $this->game->setTurnEnded($currentPlayerId, true);
 
         $this->notify->all("turnEnded", clienttranslate('${player_name} ends the turn'), [
@@ -247,7 +246,6 @@ class PlaceTile extends GameState {
         if (!$this->game->hasTurnEnded($playerId)) {
             if ($this->game->isAwaitingTurnConfirm($playerId)) {
                 $this->game->finalizeTurn($playerId);
-                $this->game->invalidateTurnUndo($playerId);
             }
             $this->game->setTurnEnded($playerId, true);
         }

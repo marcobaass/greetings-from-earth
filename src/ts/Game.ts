@@ -315,42 +315,52 @@ export class Game {
       this.renderRoundTracker(Number(pId), gamedatas.currentRound);
     });
 
-    const placements = gamedatas.placements ?? [];
-    const ps = gamedatas.playerState;
+    const boards = gamedatas.playerBoards ?? {};
+    for (const [playerIdStr, board] of Object.entries(boards)) {
+      const playerId = Number(playerIdStr);
+      const layer = document.getElementById(`gfe-tiles-layer-${playerId}`);
+      if (layer) layer.innerHTML = "";
 
-    for (const p of placements) {
-      const isLast =
-        Number(p.x) === Number(ps.last_x) &&
-        Number(p.y) === Number(ps.last_y) &&
-        p.tile_type === ps.last_tile_type &&
-        Number(p.rotation) === Number(ps.last_rotation) &&
-        Number(p.mirror) === Number(ps.last_mirror);
-      this.drawTileOnSVG(myId, p.tile_type, Number(p.x), Number(p.y), Number(p.rotation), Number(p.mirror) === 1, isLast);
+      const placements = this.normalizePlacements(board.placements);
+      for (const p of placements) {
+        const isLast =
+          Number(p.x) === Number(board.last_x) &&
+          Number(p.y) === Number(board.last_y) &&
+          p.tile_type === board.last_tile_type &&
+          Number(p.rotation) === Number(board.last_rotation) &&
+          Number(p.mirror) === Number(board.last_mirror);
+        this.drawTileOnSVG(playerId, p.tile_type, Number(p.x), Number(p.y), Number(p.rotation), Number(p.mirror) === 1, isLast);
+      }
+
+      const monument = Array.isArray(board.monument_completed)
+        ? board.monument_completed
+        : (JSON.parse(String(board.monument_completed || "[]")) as string[]);
+      const mustsee = Array.isArray(board.mustsee_completed)
+        ? board.mustsee_completed
+        : (JSON.parse(String(board.mustsee_completed || "[]")) as string[]);
+      const streetArt = Array.isArray(board.street_art_completed)
+        ? board.street_art_completed
+        : (JSON.parse(String(board.street_art_completed || "[]")) as string[]);
+
+      this.renderMonumentCollectionTrack(
+        playerId,
+        monument.length,
+        board.collection_count,
+        board.monument_score,
+        board.collection_score,
+        board.monument_collection_score
+      );
+      this.renderMustSeeUfoTrack(
+        playerId,
+        board.ufo_count,
+        mustsee.length,
+        board.mustsee_score,
+        board.ufo_score,
+        board.monument_collection_score,
+        board.street_art_score
+      );
+      this.renderStreetArtTrack(playerId, streetArt, board.street_art_score);
     }
-
-    const monument = JSON.parse(String(gamedatas.playerState.monument_completed || "[]")) as string[];
-    const streetArt = JSON.parse(String(gamedatas.playerState.street_art_completed || "[]")) as string[];
-
-    this.renderStreetArtTrack(myId, streetArt, Number(gamedatas.playerState.street_art_score));
-
-    this.renderMonumentCollectionTrack(
-      myId,
-      monument.length,
-      Number(gamedatas.playerState.collection_count),
-      Number(gamedatas.playerState.monument_score),
-      Number(gamedatas.playerState.collection_score),
-      Number(gamedatas.playerState.monument_collection_score)
-    );
-    const mustsee = JSON.parse(String(gamedatas.playerState.mustsee_completed || "[]")) as string[];
-    this.renderMustSeeUfoTrack(
-      myId,
-      Number(gamedatas.playerState.ufo_count),
-      mustsee.length,
-      Number(gamedatas.playerState.mustsee_score),
-      Number(gamedatas.playerState.ufo_score),
-      Number(gamedatas.playerState.monument_collection_score),
-      Number(gamedatas.playerState.street_art_score)
-    );
 
     this.setupNotifications();
   }
@@ -362,12 +372,64 @@ export class Game {
   async notif_newRound(args: NotifNewRoundArgs) {
     this.placeTile.clearPendingTiles();
     this.placeTile.setCanUndo(false);
+    const ps = this.bga.gameui.gamedatas.playerState;
+    ps.cells_this_turn = "[]";
+    ps.pending_bonus_tiles = "[]";
+    ps.pending_bonus_slots = 0;
+    ps.street_art_pending = 0;
     this.bga.gameui.gamedatas.currentRound = args.round;
     Object.keys(this.bga.gameui.gamedatas.players).forEach((pId) => {
       this.renderRoundTracker(Number(pId), args.round);
     });
     const roundEl = document.getElementById("gfe-round");
     if (roundEl) roundEl.textContent = String(args.round);
+
+    const boards = args.playerBoards ?? {};
+    for (const [playerIdStr, board] of Object.entries(boards)) {
+      const playerId = Number(playerIdStr);
+      const layer = document.getElementById(`gfe-tiles-layer-${playerId}`);
+      if (layer) layer.innerHTML = "";
+
+      const placements = this.normalizePlacements(board.placements);
+      for (const p of placements) {
+        const isLast =
+          Number(p.x) === Number(board.last_x) &&
+          Number(p.y) === Number(board.last_y) &&
+          p.tile_type === board.last_tile_type &&
+          Number(p.rotation) === Number(board.last_rotation) &&
+          Number(p.mirror) === Number(board.last_mirror);
+        this.drawTileOnSVG(playerId, p.tile_type, Number(p.x), Number(p.y), Number(p.rotation), Number(p.mirror) === 1, isLast);
+      }
+
+      const monument = Array.isArray(board.monument_completed)
+        ? board.monument_completed
+        : (JSON.parse(String(board.monument_completed || "[]")) as string[]);
+      const mustsee = Array.isArray(board.mustsee_completed)
+        ? board.mustsee_completed
+        : (JSON.parse(String(board.mustsee_completed || "[]")) as string[]);
+      const streetArt = Array.isArray(board.street_art_completed)
+        ? board.street_art_completed
+        : (JSON.parse(String(board.street_art_completed || "[]")) as string[]);
+
+      this.renderMonumentCollectionTrack(
+        playerId,
+        monument.length,
+        board.collection_count,
+        board.monument_score,
+        board.collection_score,
+        board.monument_collection_score
+      );
+      this.renderMustSeeUfoTrack(
+        playerId,
+        board.ufo_count,
+        mustsee.length,
+        board.mustsee_score,
+        board.ufo_score,
+        board.monument_collection_score,
+        board.street_art_score
+      );
+      this.renderStreetArtTrack(playerId, streetArt, board.street_art_score);
+    }
   }
 
   // ===== Helper functions =====
@@ -488,6 +550,9 @@ export class Game {
   }
 
   async notif_tilePlaced(args: NotifTilePlacedArgs) {
+    const myId = this.bga.players.getCurrentPlayerId();
+    if (Number(args.player_id) !== Number(myId)) return;
+
     document
       .getElementById(`gfe-tiles-layer-${args.player_id}`)
       ?.querySelectorAll(".gfe-tile-last")
@@ -496,24 +561,20 @@ export class Game {
 
     const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
 
-    const myId = this.bga.players.getCurrentPlayerId();
+    const gamedatas = this.bga.gameui.gamedatas;
+    const covered = this.normalizeCoveredCells(gamedatas.coveredCells);
 
-    if (Number(args.player_id) === Number(myId)) {
-      const gamedatas = this.bga.gameui.gamedatas;
-      const covered = this.normalizeCoveredCells(gamedatas.coveredCells);
+    cells.forEach(([x, y]) => {
+      covered.push({ x, y, tile_type: args.tile_type });
+    });
+    gamedatas.coveredCells = covered;
 
-      cells.forEach(([x, y]) => {
-        covered.push({ x, y, tile_type: args.tile_type });
-      });
-      gamedatas.coveredCells = covered;
-
-      gamedatas.playerState.has_started = 1;
-      gamedatas.playerState.last_x = args.x;
-      gamedatas.playerState.last_y = args.y;
-      gamedatas.playerState.last_tile_type = args.tile_type;
-      gamedatas.playerState.last_rotation = args.rotation;
-      gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
-    }
+    gamedatas.playerState.has_started = 1;
+    gamedatas.playerState.last_x = args.x;
+    gamedatas.playerState.last_y = args.y;
+    gamedatas.playerState.last_tile_type = args.tile_type;
+    gamedatas.playerState.last_rotation = args.rotation;
+    gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
 
     this.applyBoardScoringFromNotif(args);
     this.continueAfterPlacement(
@@ -526,6 +587,9 @@ export class Game {
   }
 
   async notif_bonusTilePlaced(args: NotifTilePlacedArgs) {
+    const myId = this.bga.players.getCurrentPlayerId();
+    if (Number(args.player_id) !== Number(myId)) return;
+
     document
       .getElementById(`gfe-tiles-layer-${args.player_id}`)
       ?.querySelectorAll(".gfe-tile-last")
@@ -534,24 +598,20 @@ export class Game {
 
     const cells = getShapeCells(args.tile_type, args.x, args.y, args.rotation, args.mirror);
 
-    const myId = this.bga.players.getCurrentPlayerId();
+    const gamedatas = this.bga.gameui.gamedatas;
+    const covered = this.normalizeCoveredCells(gamedatas.coveredCells);
 
-    if (Number(args.player_id) === Number(myId)) {
-      const gamedatas = this.bga.gameui.gamedatas;
-      const covered = this.normalizeCoveredCells(gamedatas.coveredCells);
+    cells.forEach(([x, y]) => {
+      covered.push({ x, y, tile_type: args.tile_type });
+    });
+    gamedatas.coveredCells = covered;
 
-      cells.forEach(([x, y]) => {
-        covered.push({ x, y, tile_type: args.tile_type });
-      });
-      gamedatas.coveredCells = covered;
-
-      gamedatas.playerState.has_started = 1;
-      gamedatas.playerState.last_x = args.x;
-      gamedatas.playerState.last_y = args.y;
-      gamedatas.playerState.last_tile_type = args.tile_type;
-      gamedatas.playerState.last_rotation = args.rotation;
-      gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
-    }
+    gamedatas.playerState.has_started = 1;
+    gamedatas.playerState.last_x = args.x;
+    gamedatas.playerState.last_y = args.y;
+    gamedatas.playerState.last_tile_type = args.tile_type;
+    gamedatas.playerState.last_rotation = args.rotation;
+    gamedatas.playerState.last_mirror = args.mirror ? 1 : 0;
 
     this.applyBoardScoringFromNotif(args);
     this.continueAfterPlacement(
@@ -564,21 +624,22 @@ export class Game {
   }
 
   async notif_streetArtChosen(args: NotifStreetArtChosenArgs) {
+    const myId = this.bga.players.getCurrentPlayerId();
+    if (Number(args.player_id) !== Number(myId)) return;
+
     const ps = this.bga.gameui.gamedatas.playerState;
     const mustsee = JSON.parse(String(ps.mustsee_completed || "[]")) as string[];
 
-    if (args.player_id === this.bga.players.getCurrentPlayerId()) {
-      this.bga.gameui.gamedatas.playerState.street_art_score = args.street_art_score;
-      this.renderMustSeeUfoTrack(
-        args.player_id,
-        ps.ufo_count,
-        mustsee.length,
-        ps.mustsee_score,
-        ps.ufo_score,
-        ps.monument_collection_score,
-        ps.street_art_score
-      );
-    }
+    this.bga.gameui.gamedatas.playerState.street_art_score = args.street_art_score;
+    this.renderMustSeeUfoTrack(
+      args.player_id,
+      ps.ufo_count,
+      mustsee.length,
+      ps.mustsee_score,
+      ps.ufo_score,
+      ps.monument_collection_score,
+      ps.street_art_score
+    );
 
     this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
 
@@ -592,24 +653,27 @@ export class Game {
   }
 
   async notif_turnFinalized(args: NotifTurnFinalizedArgs) {
+    const myId = this.bga.players.getCurrentPlayerId();
+    if (Number(args.player_id) !== Number(myId)) return;
+
     this.applyBoardScoringFromNotif(args);
   }
 
   async notif_turnUndone(args: NotifTurnUndoneArgs) {
-    const playerId = args.player_id;
     const myId = this.bga.players.getCurrentPlayerId();
+    if (Number(args.player_id) !== Number(myId)) return;
+
+    const playerId = args.player_id;
     const layer = document.getElementById(`gfe-tiles-layer-${playerId}`);
     if (layer) {
       layer.innerHTML = "";
     }
 
     // 2. if this is MY undo, refresh client memory (needed for legal placement)
-    if (Number(playerId) === Number(myId)) {
-      this.bga.gameui.gamedatas.coveredCells = this.normalizeCoveredCells(args.coveredCells);
-      this.bga.gameui.gamedatas.placements = this.normalizePlacements(args.placements);
-      this.bga.gameui.gamedatas.playerState = args.playerState;
-      this.placeTile.clearCanSurviveRemaining();
-    }
+    this.bga.gameui.gamedatas.coveredCells = this.normalizeCoveredCells(args.coveredCells);
+    this.bga.gameui.gamedatas.placements = this.normalizePlacements(args.placements);
+    this.bga.gameui.gamedatas.playerState = args.playerState;
+    this.placeTile.clearCanSurviveRemaining();
 
     // 3. redraw remaining tiles (same loop as setup ~277–288)
     const ps = args.playerState;
@@ -649,9 +713,7 @@ export class Game {
     this.renderStreetArtTrack(playerId, streetArt, Number(ps.street_art_score));
 
     // 5. if this is MY undo, reset UI back to “place a tile”
-    if (Number(playerId) === Number(myId)) {
-      this.placeTile.resetAfterUndo();
-    }
+    this.placeTile.resetAfterUndo();
   }
 
   async notif_turnEnded(args: { player_id: number; player_name: string }) {

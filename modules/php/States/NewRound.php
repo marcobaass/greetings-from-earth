@@ -39,9 +39,16 @@ class NewRound extends \Bga\GameFramework\States\GameState {
         $diceRoll = bga_rand(1, 6);
         $this->game->setGameStateValue("dice_roll", $diceRoll);
 
+        $playerBoards = [];
+        foreach (array_keys($players) as $playerId) {
+            $pid = (int) $playerId;
+            $playerBoards[$pid] = $this->game->getPublicPlayerBoard($pid, true);
+        }
+
         $this->notify->all("newRound", clienttranslate('--- Round ${round} --- Dice roll: ${dice_roll}'), [
             "round" => $currentRound,
             "dice_roll" => $diceRoll,
+            "playerBoards" => $playerBoards,
         ]);
 
         $this->gamestate->setAllPlayersMultiactive();

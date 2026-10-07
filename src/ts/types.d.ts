@@ -3,6 +3,7 @@ interface GreetingsFromEarthPlayer extends Player {}
 interface GreetingsFromEarthGamedatas extends Gamedatas<GreetingsFromEarthPlayer> {
   currentRound: number;
   diceRoll: number;
+  playerBoards: NotifNewRoundArgs["playerBoards"];
   coveredCells: { x: number; y: number; tile_type: string }[];
   placements: { tile_type: string; x: number; y: number; rotation: number; mirror: number }[];
   playerState: {
@@ -73,6 +74,28 @@ interface NotifTilePlacedArgs {
 interface NotifNewRoundArgs {
   round: number;
   dice_roll: number;
+  playerBoards: Record<
+    string,
+    {
+      placements: GreetingsFromEarthGamedatas["placements"];
+      collection_count: number;
+      collection_score: number;
+      ufo_count: number;
+      ufo_score: number;
+      mustsee_completed: string[];
+      mustsee_score: number;
+      monument_completed: string[];
+      monument_score: number;
+      monument_collection_score: number;
+      street_art_score: number;
+      street_art_completed: string[];
+      last_x: number | null;
+      last_y: number | null;
+      last_tile_type: string | null;
+      last_rotation: number;
+      last_mirror: number;
+    }
+  >;
 }
 
 interface NotifTurnFinalizedArgs {

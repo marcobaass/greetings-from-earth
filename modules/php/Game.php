@@ -106,6 +106,23 @@ class Game extends \Bga\GameFramework\Table {
 
         $result["playerState"] = $this->getObjectFromDb("SELECT * FROM `player_state` WHERE `player_id` = '$currentPlayerId'");
 
+        $playerBoards = [];
+        $players = $this->loadPlayersBasicInfos();
+        foreach (array_keys($players) as $playerId) {
+            $pid = (int) $playerId;
+            $live = $pid === $currentPlayerId;
+            $board = $this->getPublicPlayerBoard($pid, $live);
+            $playerBoards[$pid] = $board;
+
+            if (!$live) {
+                $key = isset($result["players"][$pid]) ? $pid : (string) $pid;
+                if (isset($result["players"][$key])) {
+                    $result["players"][$key]["score"] = $board["player_score"];
+                }
+            }
+        }
+        $result["playerBoards"] = $playerBoards;
+
         return $result;
     }
 
@@ -1003,6 +1020,98 @@ class Game extends \Bga\GameFramework\Table {
         $this->checkUFOs($playerId, $cellKeys);
         $this->checkMustSeeClusters($playerId);
         return $this->getBoardScoringNotifArgs($playerId);
+    }
+
+    /**
+     * Public sheet payload for one player.
+     * $live true  = current DB (self, or NewRound reveal)
+     * $live false = turn_snapshot only (other players mid-round / F5)
+     */
+    public function getPublicPlayerBoard(int $playerId, bool $live): array {
+        if ($live) {
+            $placements = $this->getObjectListFromDB(
+                "SELECT `tile_type`, `x`, `y`, `rotation`, `mirror`
+             FROM `player_placements`
+             WHERE `player_id` = '$playerId'
+             ORDER BY `x`, `y`"
+            );
+            $ps = $this->getObjectFromDb(
+                "SELECT `street_art_completed`, `last_x`, `last_y`, `last_tile_type`, `last_rotation`, `last_mirror`
+             FROM `player_state` WHERE `player_id` = '$playerId'"
+            );
+            return array_merge($this->getBoardScoringNotifArgs($playerId), [
+                "placements" => $placements,
+                "street_art_completed" => json_decode($ps["street_art_completed"] ?? "[]", true) ?? [],
+                "last_x" => $ps["last_x"],
+                "last_y" => $ps["last_y"],
+                "last_tile_type" => $ps["last_tile_type"],
+                "last_rotation" => $ps["last_rotation"],
+                "last_mirror" => $ps["last_mirror"],
+                "player_score" => (int) $this->getUniqueValueFromDB("SELECT `player_score` FROM `player` WHERE `player_id` = '$playerId'"),
+            ]);
+        }
+
+        $row = $this->getObjectFromDb("SELECT `turn_snapshot` FROM `player_state` WHERE `player_id` = '$playerId'");
+        $snap = json_decode($row["turn_snapshot"] ?? "{}", true);
+        if (!is_array($snap) || !isset($snap["max_placement_id"])) {
+            return [
+                "placements" => [],
+                "collection_count" => 0,
+                "collection_score" => 0,
+                "ufo_count" => 0,
+                "ufo_score" => 0,
+                "mustsee_completed" => [],
+                "mustsee_score" => 0,
+                "monument_completed" => [],
+                "monument_score" => 0,
+                "monument_collection_score" => 0,
+                "street_art_score" => 0,
+                "street_art_completed" => [],
+                "last_x" => null,
+                "last_y" => null,
+                "last_tile_type" => null,
+                "last_rotation" => 0,
+                "last_mirror" => 0,
+                "player_score" => 0,
+            ];
+        }
+
+        $maxPlacementId = (int) $snap["max_placement_id"];
+        $placements = $this->getObjectListFromDB(
+            "SELECT `tile_type`, `x`, `y`, `rotation`, `mirror`
+         FROM `player_placements`
+         WHERE `player_id` = '$playerId' AND `placement_id` <= $maxPlacementId
+         ORDER BY `x`, `y`"
+        );
+
+        $monumentCompleted = $snap["monument_completed"] ?? "[]";
+        $mustseeCompleted = $snap["mustsee_completed"] ?? "[]";
+        $streetArtCompleted = $snap["street_art_completed"] ?? "[]";
+
+        return [
+            "placements" => $placements,
+            "collection_count" => (int) ($snap["collection_count"] ?? 0),
+            "collection_score" => (int) ($snap["collection_score"] ?? 0),
+            "ufo_count" => (int) ($snap["ufo_count"] ?? 0),
+            "ufo_score" => (int) ($snap["ufo_score"] ?? 0),
+            "mustsee_completed" => is_array($mustseeCompleted) ? $mustseeCompleted : json_decode((string) $mustseeCompleted, true) ?? [],
+            "mustsee_score" => (int) ($snap["mustsee_score"] ?? 0),
+            "monument_completed" => is_array($monumentCompleted)
+                ? $monumentCompleted
+                : json_decode((string) $monumentCompleted, true) ?? [],
+            "monument_score" => (int) ($snap["monument_score"] ?? 0),
+            "monument_collection_score" => (int) ($snap["monument_collection_score"] ?? 0),
+            "street_art_score" => (int) ($snap["street_art_score"] ?? 0),
+            "street_art_completed" => is_array($streetArtCompleted)
+                ? $streetArtCompleted
+                : json_decode((string) $streetArtCompleted, true) ?? [],
+            "last_x" => $snap["last_x"] ?? null,
+            "last_y" => $snap["last_y"] ?? null,
+            "last_tile_type" => $snap["last_tile_type"] ?? null,
+            "last_rotation" => (int) ($snap["last_rotation"] ?? 0),
+            "last_mirror" => (int) ($snap["last_mirror"] ?? 0),
+            "player_score" => (int) ($snap["player_score"] ?? 0),
+        ];
     }
 
     public function getBoardScoringNotifArgs(int $playerId): array {
