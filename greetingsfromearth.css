@@ -110,7 +110,7 @@
 }
 
 .gfe-cell {
-  /* border: 1px solid rgba(255, 0, 0, 0.3); */
+  position: relative;
   box-sizing: border-box;
 }
 
@@ -452,4 +452,37 @@
 .gfe-tile-button:disabled {
   background: rgb(131, 131, 131);
   cursor: default;
+}
+
+/* Highlighting legal cells: four L-shaped corners */
+.gfe-cell-legal-hint::before {
+  content: "";
+  position: absolute;
+  inset: 2px 3px 2px 1px;
+  pointer-events: none;
+  --c: rgba(0, 160, 60, 0.85); /* colour */
+  --t: 3px; /* line thickness */
+  --l: 30%; /* arm length */
+  background:
+    /* top-left */
+    linear-gradient(var(--c), var(--c)) top left / var(--l) var(--t),
+    linear-gradient(var(--c), var(--c)) top left / var(--t) var(--l),
+    /* top-right */ linear-gradient(var(--c), var(--c)) top right / var(--l) var(--t),
+    linear-gradient(var(--c), var(--c)) top right / var(--t) var(--l),
+    /* bottom-left */ linear-gradient(var(--c), var(--c)) bottom left / var(--l) var(--t),
+    linear-gradient(var(--c), var(--c)) bottom left / var(--t) var(--l),
+    /* bottom-right */ linear-gradient(var(--c), var(--c)) bottom right / var(--l) var(--t),
+    linear-gradient(var(--c), var(--c)) bottom right / var(--t) var(--l);
+  background-repeat: no-repeat;
+  animation: gfe-legal-hint-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes gfe-legal-hint-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
 }

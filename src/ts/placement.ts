@@ -136,12 +136,33 @@ export function canI1BePlaced(gamedatas: GreetingsFromEarthGamedatas): boolean {
   const depth = TOTAL_ROUNDS - Number(gamedatas.currentRound);
   if (!Number.isFinite(depth) || depth <= 0) return true;
 
-  const coveredList = (
-    Array.isArray(gamedatas.coveredCells) ? gamedatas.coveredCells : Object.values(gamedatas.coveredCells ?? {})
-  ) as { x: number; y: number; tile_type: string }[];
+  const coveredList = (Array.isArray(gamedatas.coveredCells) ? gamedatas.coveredCells : Object.values(gamedatas.coveredCells ?? {})) as {
+    x: number;
+    y: number;
+    tile_type: string;
+  }[];
   const covered = new Set(coveredList.map((cell) => cellKey(Number(cell.x), Number(cell.y))));
   const hasStarted = Number(gamedatas.playerState.has_started) !== 0;
   const lastCells = hasStarted ? getLastPlacedTileCells(gamedatas.playerState) : [];
 
   return canSurviveRemainingRoundsWithI1(depth, covered, hasStarted, lastCells, new Map());
+}
+
+/**
+ * Empty cells adjacent to S-Bahn (and last tile once started)
+ * where an I1 could be placed — used as placement-hint markers.
+ */
+export function getLegalPlacementHintCells(gamedatas: GreetingsFromEarthGamedatas): [number, number][] {
+  if (!gamedatas.playerState) return [];
+
+  const coveredList = (Array.isArray(gamedatas.coveredCells) ? gamedatas.coveredCells : Object.values(gamedatas.coveredCells ?? {})) as {
+    x: number;
+    y: number;
+    tile_type: string;
+  }[];
+  const covered = new Set(coveredList.map((cell) => cellKey(Number(cell.x), Number(cell.y))));
+  const hasStarted = Number(gamedatas.playerState.has_started) !== 0;
+  const lastCells = hasStarted ? getLastPlacedTileCells(gamedatas.playerState) : [];
+
+  return collectLegalI1Moves(covered, hasStarted, lastCells);
 }

@@ -1453,6 +1453,14 @@ class Game extends \Bga\GameFramework\Table {
     // ===== DB UPGRADE =====
 
     public function upgradeTableDb($from_version): void {
-        // Handle DB migrations here when needed
+        if ($from_version <= 2610071056) {
+            // Idempotent: skip if column already exists on the live table
+            $hasColumn = $this->getUniqueValueFromDB("SHOW COLUMNS FROM `player_state` LIKE 'journey_ended'");
+            if ($hasColumn) {
+                return;
+            }
+            $sql = "ALTER TABLE DBPREFIX_player_state ADD `journey_ended` TINYINT(1) NOT NULL DEFAULT 0";
+            self::applyDbUpgradeToAllDB($sql);
+        }
     }
 }

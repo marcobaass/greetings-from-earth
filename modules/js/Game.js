@@ -324,6 +324,19 @@ function canI1BePlaced(gamedatas) {
     const lastCells = hasStarted ? getLastPlacedTileCells(gamedatas.playerState) : [];
     return canSurviveRemainingRoundsWithI1(depth, covered, hasStarted, lastCells, new Map());
 }
+/**
+ * Empty cells adjacent to S-Bahn (and last tile once started)
+ * where an I1 could be placed — used as placement-hint markers.
+ */
+function getLegalPlacementHintCells(gamedatas) {
+    if (!gamedatas.playerState)
+        return [];
+    const coveredList = (Array.isArray(gamedatas.coveredCells) ? gamedatas.coveredCells : Object.values(gamedatas.coveredCells ?? {}));
+    const covered = new Set(coveredList.map((cell) => cellKey(Number(cell.x), Number(cell.y))));
+    const hasStarted = Number(gamedatas.playerState.has_started) !== 0;
+    const lastCells = hasStarted ? getLastPlacedTileCells(gamedatas.playerState) : [];
+    return collectLegalI1Moves(covered, hasStarted, lastCells);
+}
 
 class PlaceTile {
     cleanUpPreview(grid) {
@@ -339,6 +352,18 @@ class PlaceTile {
         grid.querySelectorAll(".gfe-tile-button").forEach((el) => {
             el.remove();
         });
+    }
+    clearLegalHints(grid) {
+        grid.querySelectorAll(".gfe-cell-legal-hint").forEach((el) => {
+            el.classList.remove("gfe-cell-legal-hint");
+        });
+    }
+    showLegalHints(grid) {
+        this.clearLegalHints(grid);
+        const cells = getLegalPlacementHintCells(this.bga.gameui.gamedatas);
+        for (const [x, y] of cells) {
+            grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`)?.classList.add("gfe-cell-legal-hint");
+        }
     }
     /**
      * After refresh: resume street art, bonus, or End turn if this turn is already in progress.
@@ -382,6 +407,7 @@ class PlaceTile {
             grid.classList.remove("gfe-play-grid-interactive");
             grid.removeEventListener("click", this.onGridClick);
             grid.removeEventListener("mousemove", this.onMouseMove);
+            this.clearLegalHints(grid);
         }
         if (streetArtGrid) {
             streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
@@ -631,6 +657,7 @@ class PlaceTile {
             streetArtGrid.removeEventListener("click", this.onStreetArtClick);
         }
         this.cleanUpPreview(grid);
+        this.showLegalHints(grid);
         // street art step removes the grid handler — put it back so bonus tiles can be positioned
         grid.removeEventListener("click", this.onGridClick);
         grid.removeEventListener("mousemove", this.onMouseMove);
@@ -654,6 +681,7 @@ class PlaceTile {
             grid.classList.remove("gfe-play-grid-interactive");
             grid.removeEventListener("click", this.onGridClick);
             grid.removeEventListener("mousemove", this.onMouseMove);
+            this.clearLegalHints(grid);
         }
         if (!streetArtGrid)
             return;
@@ -694,6 +722,7 @@ class PlaceTile {
             grid.classList.remove("gfe-play-grid-interactive");
             grid.removeEventListener("click", this.onGridClick);
             grid.removeEventListener("mousemove", this.onMouseMove);
+            this.clearLegalHints(grid);
         }
         if (streetArtGrid) {
             streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
@@ -831,6 +860,7 @@ class PlaceTile {
             const grid = document.getElementById(`gfe-play-grid-${playerId}`);
             if (!grid)
                 return;
+            this.showLegalHints(grid);
             grid.removeEventListener("click", this.onGridClick);
             grid.removeEventListener("mousemove", this.onMouseMove);
             grid.addEventListener("click", this.onGridClick);

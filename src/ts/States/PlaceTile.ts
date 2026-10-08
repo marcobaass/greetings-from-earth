@@ -1,5 +1,5 @@
 import { Game } from "../Game";
-import { isPlacementLegal, canI1BePlaced } from "../placement";
+import { isPlacementLegal, canI1BePlaced, getLegalPlacementHintCells } from "../placement";
 import { computeTileShift, getShapeCells, isInsideGrid, cellsToOutlinePath, tileButtonHtml } from "../tiles";
 
 export class PlaceTile {
@@ -105,6 +105,19 @@ export class PlaceTile {
     });
   }
 
+  private clearLegalHints(grid: HTMLElement) {
+    grid.querySelectorAll(".gfe-cell-legal-hint").forEach((el) => {
+      el.classList.remove("gfe-cell-legal-hint");
+    });
+  }
+  private showLegalHints(grid: HTMLElement) {
+    this.clearLegalHints(grid);
+    const cells = getLegalPlacementHintCells(this.bga.gameui.gamedatas);
+    for (const [x, y] of cells) {
+      grid.querySelector(`.gfe-cell[data-x="${x}"][data-y="${y}"]`)?.classList.add("gfe-cell-legal-hint");
+    }
+  }
+
   /**
    * After refresh: resume street art, bonus, or End turn if this turn is already in progress.
    */
@@ -152,6 +165,7 @@ export class PlaceTile {
       grid.classList.remove("gfe-play-grid-interactive");
       grid.removeEventListener("click", this.onGridClick);
       grid.removeEventListener("mousemove", this.onMouseMove);
+      this.clearLegalHints(grid);
     }
 
     if (streetArtGrid) {
@@ -444,6 +458,7 @@ export class PlaceTile {
     }
 
     this.cleanUpPreview(grid);
+    this.showLegalHints(grid);
 
     // street art step removes the grid handler — put it back so bonus tiles can be positioned
     grid.removeEventListener("click", this.onGridClick);
@@ -473,6 +488,7 @@ export class PlaceTile {
       grid.classList.remove("gfe-play-grid-interactive");
       grid.removeEventListener("click", this.onGridClick);
       grid.removeEventListener("mousemove", this.onMouseMove);
+      this.clearLegalHints(grid);
     }
 
     if (!streetArtGrid) return;
@@ -519,6 +535,7 @@ export class PlaceTile {
       grid.classList.remove("gfe-play-grid-interactive");
       grid.removeEventListener("click", this.onGridClick);
       grid.removeEventListener("mousemove", this.onMouseMove);
+      this.clearLegalHints(grid);
     }
 
     if (streetArtGrid) {
@@ -587,6 +604,8 @@ export class PlaceTile {
       const grid = document.getElementById(`gfe-play-grid-${playerId}`);
 
       if (!grid) return;
+
+      this.showLegalHints(grid);
 
       grid.removeEventListener("click", this.onGridClick);
       grid.removeEventListener("mousemove", this.onMouseMove);
