@@ -1,6 +1,6 @@
 import { PlaceTile } from "./States/PlaceTile";
 import { PlaceBonus } from "./States/PlaceBonus";
-import { getShapeCells, cellsToOutlinePath } from "./tiles";
+import { getShapeCells, cellsToOutlinePath, tileLogHtml } from "./tiles";
 
 export class Game {
   public bga: Bga<GreetingsFromEarthPlayer, GreetingsFromEarthGamedatas>;
@@ -14,6 +14,7 @@ export class Game {
 
   constructor(bga: Bga<GreetingsFromEarthPlayer, GreetingsFromEarthGamedatas>) {
     this.bga = bga;
+    this.bga.gameui.bgaFormatText = (log, args) => this.bgaFormatText(log, args);
 
     // Register state classes — names must match PHP state class names
     this.placeTile = new PlaceTile(this, bga);
@@ -367,6 +368,20 @@ export class Game {
 
   setupNotifications() {
     this.bga.notifications.setupPromiseNotifications({});
+  }
+
+  bgaFormatText(log: string, args: any): { log: string; args: any } {
+    try {
+      if (log && args && !args.processed) {
+        args.processed = true;
+        if (args.tile_label) {
+          args.tile_label = tileLogHtml(String(args.tile_label));
+        }
+      }
+    } catch (e) {
+      console.error("bgaFormatText", log, args, e);
+    }
+    return { log, args };
   }
 
   async notif_newRound(args: NotifNewRoundArgs) {

@@ -68,12 +68,13 @@ class PlaceTile extends GameState {
 
         $this->notify->all(
             "tilePlaced",
-            clienttranslate('${player_name} places a ${tile_type} tile'),
+            clienttranslate('${player_name} places a tile ${tile_label}'),
             array_merge(
                 [
                     "player_id" => $currentPlayerId,
                     "player_name" => $this->game->getPlayerNameById($currentPlayerId),
                     "tile_type" => $tileType,
+                    "tile_label" => $tileType,
                     "x" => $x,
                     "y" => $y,
                     "rotation" => $rotation,
@@ -221,12 +222,13 @@ class PlaceTile extends GameState {
 
         $this->notify->all(
             "bonusTilePlaced",
-            clienttranslate('${player_name} places a bonus ${tile_type} tile'),
+            clienttranslate('${player_name} places a bonus tile ${tile_label}'),
             array_merge(
                 [
                     "player_id" => $currentPlayerId,
                     "player_name" => $this->game->getPlayerNameById($currentPlayerId),
                     "tile_type" => $tileType,
+                    "tile_label" => $tileType,
                     "x" => $x,
                     "y" => $y,
                     "rotation" => $rotation,

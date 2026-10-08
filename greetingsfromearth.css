@@ -486,3 +486,16 @@
     opacity: 1;
   }
 }
+
+/* SVG tile log in the turn history */
+.gfe-log-tile {
+  display: inline-flex;
+  vertical-align: middle; /* or try -0.15em / -2px if still high */
+  margin: 0 2px;
+}
+
+.gfe-log-tile svg {
+  display: block;
+  width: 1.75em;
+  height: 1.75em;
+}

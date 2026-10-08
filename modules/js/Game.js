@@ -206,6 +206,23 @@ function tileButtonHtml(tileType) {
     const viewBox = `${originX} ${originY} ${box} ${box}`;
     return `<svg width="40" height="40" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg"><path d="${outline}" fill="none" stroke="white" stroke-width="0.25"/></svg>`;
 }
+function tileLogHtml(tileType) {
+    const shape = getShapeCells(tileType, 0, 0, 0, false);
+    const outline = cellsToOutlinePath(shape);
+    const xs = shape.map(([x]) => x);
+    const ys = shape.map(([, y]) => y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs) + 1;
+    const maxY = Math.max(...ys) + 1;
+    const box = 4;
+    const width = maxX - minX;
+    const height = maxY - minY;
+    const originX = minX - (box - width) / 2;
+    const originY = minY - (box - height) / 2;
+    const viewBox = `${originX} ${originY} ${box} ${box}`;
+    return `<span class="gfe-log-tile" title="${tileType}"><svg width="24" height="24" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg"><path d="${outline}" fill="none" stroke="#1a1a1a" stroke-width="0.25"/></svg></span>`;
+}
 
 const TOTAL_ROUNDS = 14;
 /** Checks if the tile overlaps with the covered cells
@@ -1038,6 +1055,7 @@ class Game {
         /** Last known scribble counts — animate only when a count increases */
         this.scribbleCounts = new Map();
         this.bga = bga;
+        this.bga.gameui.bgaFormatText = (log, args) => this.bgaFormatText(log, args);
         // Register state classes — names must match PHP state class names
         this.placeTile = new PlaceTile(this, bga);
         this.placeBonus = new PlaceBonus(this, bga);
@@ -1297,6 +1315,20 @@ class Game {
     }
     setupNotifications() {
         this.bga.notifications.setupPromiseNotifications({});
+    }
+    bgaFormatText(log, args) {
+        try {
+            if (log && args && !args.processed) {
+                args.processed = true;
+                if (args.tile_label) {
+                    args.tile_label = tileLogHtml(String(args.tile_label));
+                }
+            }
+        }
+        catch (e) {
+            console.error("bgaFormatText", log, args, e);
+        }
+        return { log, args };
     }
     async notif_newRound(args) {
         this.placeTile.clearPendingTiles();
