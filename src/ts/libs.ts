@@ -15,3 +15,7 @@ const BgaCards: typeof BgaCardsType = await globalThis.importEsmLib('bga-cards',
 
 export { BgaAnimations, BgaCards };
 */
+
+const BgaZoom = await globalThis.importEsmLib("bga-zoom", "1.x");
+
+export { BgaZoom };

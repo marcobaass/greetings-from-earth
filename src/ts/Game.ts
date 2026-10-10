@@ -1,6 +1,7 @@
 import { PlaceTile } from "./States/PlaceTile";
 import { PlaceBonus } from "./States/PlaceBonus";
 import { getShapeCells, cellsToOutlinePath, tileLogHtml } from "./tiles";
+import { BgaZoom } from "./libs";
 
 export class Game {
   public bga: Bga<GreetingsFromEarthPlayer, GreetingsFromEarthGamedatas>;
@@ -252,6 +253,19 @@ export class Game {
             </div>
         `
     );
+
+    const LOCAL_STORAGE_ZOOM_KEY = "gfe-zoom";
+
+    new BgaZoom.Manager({
+      element: document.getElementById("gfe-game-area")!,
+      localStorageKey: LOCAL_STORAGE_ZOOM_KEY,
+      zoomControls: {
+        color: "black"
+      },
+      zoomLevels: [1, 1.5, 2],
+      defaultZoomLevel: 1,
+      autoZoom: { expectedWidth: 900, minZoomLevel: 0.5 }
+    });
 
     // Set up player boards
     const myId = this.bga.players.getCurrentPlayerId();

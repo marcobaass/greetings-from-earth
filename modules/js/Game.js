@@ -1050,6 +1050,24 @@ class PlaceBonus {
     }
 }
 
+/*
+To use the BGA libs, add `import { BgaAnimations, BgaCards } from "./libs";` in the files using them.
+
+To get the latest typing files (that you would save at the root of your game), read the lib doc and see the demo, go to:
+https://en.doc.boardgamearena.com/BgaAnimations
+https://en.doc.boardgamearena.com/BgaCards
+*/
+/*
+import type { BgaAnimations as BgaAnimationsType } from "../../bga-animations";
+import type { BgaCards as BgaCardsType } from "../../bga-cards";
+
+const BgaAnimations: typeof BgaAnimationsType = await globalThis.importEsmLib('bga-animations', '1.x');
+const BgaCards: typeof BgaCardsType = await globalThis.importEsmLib('bga-cards', '1.x');
+
+export { BgaAnimations, BgaCards };
+*/
+const BgaZoom = await globalThis.importEsmLib("bga-zoom", "1.x");
+
 class Game {
     constructor(bga) {
         /** Last known scribble counts — animate only when a count increases */
@@ -1229,6 +1247,17 @@ class Game {
                 <div id="gfe-player-boards"></div>
             </div>
         `);
+        const LOCAL_STORAGE_ZOOM_KEY = "gfe-zoom";
+        new BgaZoom.Manager({
+            element: document.getElementById("gfe-game-area"),
+            localStorageKey: LOCAL_STORAGE_ZOOM_KEY,
+            zoomControls: {
+                color: "black"
+            },
+            zoomLevels: [1, 1.5, 2],
+            defaultZoomLevel: 1,
+            autoZoom: { expectedWidth: 900, minZoomLevel: 0.5 }
+        });
         // Set up player boards
         const myId = this.bga.players.getCurrentPlayerId();
         const orderedPlayerIds = [myId, ...gamedatas.playerorder.map((id) => Number(id)).filter((id) => id !== myId)];
