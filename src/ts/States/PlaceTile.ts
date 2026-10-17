@@ -1,12 +1,18 @@
 import { Game } from "../Game";
 import { isPlacementLegal, canI1BePlaced, getLegalPlacementHintCells } from "../placement";
-import { computeTileShift, getShapeCells, isInsideGrid, cellsToOutlinePath, tileButtonHtml } from "../tiles";
+import { computeTileShift, getShapeCellsAroundPivot, pivotToAnchor, isInsideGrid, cellsToOutlinePath, tileButtonHtml } from "../tiles";
+
+/** Distance (in cells) from the pivot centre to the control buttons */
+const RING_RADIUS = 3.2;
+const GRID_COLS = 18;
+const GRID_ROWS = 13;
 
 export class PlaceTile {
   private tileSelected: string | null = null;
   private placeTileArgs: PlaceTileArgs | null = null;
-  private anchorX: number | null = null;
-  private anchorY: number | null = null;
+  /** Grid cell of the tile's pivot — rotate/mirror happen around it and the button ring is centred on it */
+  private pivotX: number | null = null;
+  private pivotY: number | null = null;
   private pendingTiles: string[] = [];
   /** Client flag: placement done, waiting for End turn / Undo */
   private awaitingEndTurn = false;
@@ -30,27 +36,24 @@ export class PlaceTile {
     if (isNaN(x) || isNaN(y)) return;
 
     // Pinned: click the current shape to pick up and drag again
-    if (!this.followingMouse && this.anchorX != null && this.anchorY != null) {
-      const pinnedCells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
+    if (!this.followingMouse && this.pivotX != null && this.pivotY != null) {
+      const pinnedCells = getShapeCellsAroundPivot(this.tileSelected, this.pivotX, this.pivotY, this.rotation, this.mirror);
       if (pinnedCells.some(([cx, cy]) => cx === x && cy === y)) {
         this.followingMouse = true;
-        this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        this.showPreview(grid, this.tileSelected, this.pivotX, this.pivotY);
         return;
       }
     }
 
-    // Pin / re-anchor at clicked cell (allowed even if illegal — ✔ stays gated)
-    let cells = getShapeCells(this.tileSelected, x, y, this.rotation, this.mirror);
+    // Pin the pivot at the clicked cell (allowed even if illegal — ✔ stays gated)
+    const cells = getShapeCellsAroundPivot(this.tileSelected, x, y, this.rotation, this.mirror);
     if (!isInsideGrid(cells)) {
       const [shiftX, shiftY] = computeTileShift(cells);
       x += shiftX;
       y += shiftY;
-      cells = getShapeCells(this.tileSelected, x, y, this.rotation, this.mirror);
     }
 
     this.followingMouse = false;
-    this.anchorX = x;
-    this.anchorY = y;
     this.showPreview(grid, this.tileSelected, x, y);
   };
 
@@ -65,7 +68,7 @@ export class PlaceTile {
     const y = Number(cell.dataset.y);
     if (isNaN(x) || isNaN(y)) return;
 
-    if (x === this.anchorX && y === this.anchorY) return;
+    if (x === this.pivotX && y === this.pivotY) return;
 
     const playerId = this.bga.players.getCurrentPlayerId();
     const grid = document.getElementById(`gfe-play-grid-${playerId}`);
@@ -149,8 +152,8 @@ export class PlaceTile {
   private resetPlacementState() {
     this.followingMouse = false;
     this.tileSelected = null;
-    this.anchorX = null;
-    this.anchorY = null;
+    this.pivotX = null;
+    this.pivotY = null;
     this.rotation = 0;
     this.mirror = false;
   }
@@ -184,22 +187,22 @@ export class PlaceTile {
    * Shows a preview of the tile on the grid
    * @param grid The grid element to show the preview on
    * @param tileType The type of tile to show the preview for
-   * @param anchorX The x coordinate of the anchor point
-   * @param anchorY The y coordinate of the anchor point
+   * @param pivotX The x coordinate of the tile's pivot cell
+   * @param pivotY The y coordinate of the tile's pivot cell
    */
-  private showPreview(grid: HTMLElement, tileType: string, anchorX: number, anchorY: number) {
-    let cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
+  private showPreview(grid: HTMLElement, tileType: string, pivotX: number, pivotY: number) {
+    let cells = getShapeCellsAroundPivot(tileType, pivotX, pivotY, this.rotation, this.mirror);
 
     // Only nudge onto the board while dragging; pinned rotate/mirror must not jump
     if (!isInsideGrid(cells) && this.followingMouse) {
       const [shiftX, shiftY] = computeTileShift(cells);
-      anchorX += shiftX;
-      anchorY += shiftY;
-      cells = getShapeCells(tileType, anchorX, anchorY, this.rotation, this.mirror);
+      pivotX += shiftX;
+      pivotY += shiftY;
+      cells = getShapeCellsAroundPivot(tileType, pivotX, pivotY, this.rotation, this.mirror);
     }
 
-    this.anchorX = anchorX;
-    this.anchorY = anchorY;
+    this.pivotX = pivotX;
+    this.pivotY = pivotY;
 
     this.cleanUpPreview(grid);
 
@@ -230,8 +233,21 @@ export class PlaceTile {
     path.setAttribute("stroke-width", "0.08");
     group.appendChild(path);
 
-    const cx = anchorX + 0.5;
-    const cy = anchorY + 0.5;
+    const cx = pivotX + 0.5;
+    const cy = pivotY + 0.5;
+
+    if (!this.followingMouse) {
+      const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      ring.setAttribute("cx", String(cx));
+      ring.setAttribute("cy", String(cy));
+      ring.setAttribute("r", String(RING_RADIUS));
+      ring.setAttribute("fill", "none");
+      ring.setAttribute("stroke", "#1362a5");
+      ring.setAttribute("stroke-width", "0.08");
+      ring.setAttribute("stroke-dasharray", "0.01 0.25");
+      ring.setAttribute("stroke-linecap", "round");
+      group.appendChild(ring);
+    }
 
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", String(cx));
@@ -269,127 +285,110 @@ export class PlaceTile {
     //   }
     // });
 
-    const anchorEl = grid.querySelector(`.gfe-cell[data-x="${this.anchorX}"][data-y="${this.anchorY}"]`);
+    const anchorEl = grid.querySelector(`.gfe-cell[data-x="${pivotX}"][data-y="${pivotY}"]`);
     if (anchorEl) {
       anchorEl.classList.add("gfe-cell-anchor");
     }
 
     if (!this.placeTileArgs) return;
 
-    this.addButtonsForTile(cells, legal, grid);
+    // While dragging the ring would chase the cursor — only show it once pinned
+    if (!this.followingMouse) {
+      this.addButtonsForTile(legal, grid);
+    }
     this.updateActionButtons(legal, grid);
   }
 
-  private addButtonsForTile(cells: [number, number][], legal: boolean, grid: HTMLElement) {
-    // calculating center origin of the tile
-    const xs = cells.map(([x]) => x);
-    const ys = cells.map(([, y]) => y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    const centerX = (minX + maxX + 1) / 2;
-    const centerY = (minY + maxY + 1) / 2;
+  /**
+   * Fixed control ring centred on the pivot cell — it only moves with the arrow buttons,
+   * never when the tile rotates or mirrors.
+   */
+  private addButtonsForTile(legal: boolean, grid: HTMLElement) {
+    if (!this.tileSelected || this.pivotX == null || this.pivotY == null) return;
 
-    // offset from center for each button
-    const leftPct = (centerX / 18) * 100;
-    const topPct = (centerY / 13) * 100;
-    const gapH = 13 * 1.25;
-    const gapV = 18 * 1.25;
+    const centerX = this.pivotX + 0.5;
+    const centerY = this.pivotY + 0.5;
+    const diagonal = RING_RADIUS / Math.SQRT2;
 
-    const mirrorButton = document.createElement("button");
-    mirrorButton.className = "gfe-tile-button";
-    mirrorButton.textContent = "↔";
-    mirrorButton.title = _("Mirror");
-    mirrorButton.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-      this.mirror = !this.mirror;
-      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-    });
-    mirrorButton.style.left = `${leftPct}%`;
-    mirrorButton.style.top = `${topPct - gapV}%`;
-    grid.appendChild(mirrorButton);
-
-    const rotateLeftButton = document.createElement("button");
-    rotateLeftButton.className = "gfe-tile-button";
-    rotateLeftButton.textContent = "↻";
-    rotateLeftButton.title = _("Rotate");
-    rotateLeftButton.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-      this.rotation = (this.rotation + 90) % 360;
-      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-    });
-    rotateLeftButton.style.left = `${leftPct - gapH}%`;
-    rotateLeftButton.style.top = `${topPct}%`;
-    grid.appendChild(rotateLeftButton);
-
-    const rotateRightButton = document.createElement("button");
-    rotateRightButton.className = "gfe-tile-button";
-    rotateRightButton.textContent = "↺";
-    rotateRightButton.title = _("Rotate");
-    rotateRightButton.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-      this.rotation = (this.rotation + 270) % 360;
-      this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
-    });
-    rotateRightButton.style.left = `${leftPct + gapH}%`;
-    rotateRightButton.style.top = `${topPct}%`;
-    grid.appendChild(rotateRightButton);
-
-    if (!this.followingMouse) {
-      const moveButton = document.createElement("button");
-      moveButton.className = "gfe-tile-button";
-      moveButton.textContent = "✥";
-      moveButton.title = _("Pick up and move");
-      moveButton.addEventListener("click", (e) => {
+    const addButton = (label: string, title: string, dx: number, dy: number, onClick: () => void, enabled = true) => {
+      const button = document.createElement("button");
+      button.className = "gfe-tile-button";
+      button.textContent = label;
+      button.title = title;
+      button.disabled = !enabled;
+      button.style.left = `${((centerX + dx) / GRID_COLS) * 100}%`;
+      button.style.top = `${((centerY + dy) / GRID_ROWS) * 100}%`;
+      button.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-        this.followingMouse = true;
-        this.showPreview(grid, this.tileSelected, this.anchorX, this.anchorY);
+        if (!this.tileSelected || this.pivotX == null || this.pivotY == null) return;
+        onClick();
       });
-      moveButton.style.left = `${leftPct - gapH}%`;
-      moveButton.style.top = `${topPct + gapV}%`;
-      grid.appendChild(moveButton);
-    }
+      grid.appendChild(button);
+      return button;
+    };
 
-    const confirmButton = document.createElement("button");
-    confirmButton.className = "gfe-tile-button";
-    confirmButton.textContent = "✔";
-    confirmButton.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (!this.tileSelected || this.anchorX == null || this.anchorY == null) return;
-      if (!legal) return;
-      const cells = getShapeCells(this.tileSelected, this.anchorX, this.anchorY, this.rotation, this.mirror);
-      if (!isPlacementLegal(cells, this.bga.gameui.gamedatas)) return;
+    const redraw = () => this.showPreview(grid, this.tileSelected!, this.pivotX!, this.pivotY!);
 
-      const action = this.pendingTiles.length > 0 ? "actPlaceBonusTile" : "actPlaceTile";
+    const canMove = (stepX: number, stepY: number) =>
+      isInsideGrid(getShapeCellsAroundPivot(this.tileSelected!, this.pivotX! + stepX, this.pivotY! + stepY, this.rotation, this.mirror));
 
-      this.bga.actions.performAction(action, {
-        tileType: this.tileSelected,
-        x: this.anchorX,
-        y: this.anchorY,
-        rotation: this.rotation,
-        mirror: this.mirror
-      });
+    const move = (stepX: number, stepY: number) => {
+      if (!canMove(stepX, stepY)) return;
+      this.pivotX! += stepX;
+      this.pivotY! += stepY;
+      redraw();
+    };
+
+    addButton("↑", _("Move up"), 0, -RING_RADIUS, () => move(0, -1), canMove(0, -1));
+    addButton("↓", _("Move down"), 0, RING_RADIUS, () => move(0, 1), canMove(0, 1));
+    addButton("←", _("Move left"), -RING_RADIUS, 0, () => move(-1, 0), canMove(-1, 0));
+    addButton("→", _("Move right"), RING_RADIUS, 0, () => move(1, 0), canMove(1, 0));
+
+    addButton("↻", _("Rotate clockwise"), -diagonal, -diagonal, () => {
+      this.rotation = (this.rotation + 90) % 360;
+      redraw();
     });
-    confirmButton.style.left = `${leftPct}%`;
-    confirmButton.style.top = `${topPct + gapV}%`;
-    if (legal) {
-      confirmButton.style.backgroundColor = "#1362a5";
-    } else {
-      confirmButton.disabled = !legal;
-    }
-    grid.appendChild(confirmButton);
+    addButton("↺", _("Rotate counterclockwise"), diagonal, -diagonal, () => {
+      this.rotation = (this.rotation + 270) % 360;
+      redraw();
+    });
+    addButton("↔", _("Mirror"), -diagonal, diagonal, () => {
+      this.mirror = !this.mirror;
+      redraw();
+    });
+
+    const confirmButton = addButton(
+      "✔",
+      _("Confirm"),
+      diagonal,
+      diagonal,
+      () => {
+        const tile = this.tileSelected!;
+        const cells = getShapeCellsAroundPivot(tile, this.pivotX!, this.pivotY!, this.rotation, this.mirror);
+        if (!isPlacementLegal(cells, this.bga.gameui.gamedatas)) return;
+
+        // Server works with the tile's [0,0] offset as anchor, not the pivot
+        const [x, y] = pivotToAnchor(tile, this.pivotX!, this.pivotY!, this.rotation, this.mirror);
+        const action = this.pendingTiles.length > 0 ? "actPlaceBonusTile" : "actPlaceTile";
+
+        this.bga.actions.performAction(action, {
+          tileType: tile,
+          x,
+          y,
+          rotation: this.rotation,
+          mirror: this.mirror
+        });
+      },
+      legal
+    );
+    confirmButton.classList.add("gfe-tile-button-confirm");
   }
 
   private selectTile(tile: string, grid: HTMLElement): void {
     this.followingMouse = true;
     this.tileSelected = tile;
-    this.anchorX = 0;
-    this.anchorY = 0;
+    this.pivotX = 0;
+    this.pivotY = 0;
     this.rotation = 0;
     this.mirror = false;
     grid.classList.add("gfe-play-grid-interactive");
@@ -429,7 +428,7 @@ export class PlaceTile {
   private addUndoButtonIfPossible() {
     if (!this.canUndo) return;
     this.bga.statusBar.addActionButton(
-      _("Undo"),
+      _("Undo all"),
       () => {
         this.bga.actions.performAction("actUndo", {});
       },

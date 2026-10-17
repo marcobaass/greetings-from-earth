@@ -59,6 +59,50 @@ export const TILE_SHAPES: Record<string, [number, number][]> = {
   ]
 };
 
+// Rotation/mirror pivot per tile — must be one of the tile's own offsets
+export const TILE_PIVOTS: Record<string, [number, number]> = {
+  I4: [1, 0],
+  U5: [1, 0],
+  L4: [0, 1],
+  T4: [1, 0],
+  SZ4: [1, 1],
+  T5: [0, 1],
+  I1: [0, 0],
+  I2: [0, 0],
+  L3: [0, 1],
+  SQR6: [0, 1]
+};
+
+/** Server anchor (offset [0,0]) for a tile whose pivot cell sits at pivotX/pivotY */
+export function pivotToAnchor(
+  tileType: string,
+  pivotX: number,
+  pivotY: number,
+  rotation: number = 0,
+  mirror: boolean = false
+): [number, number] {
+  const shape = TILE_SHAPES[tileType];
+  if (!shape) return [pivotX, pivotY];
+  const [px, py] = TILE_PIVOTS[tileType] ?? [0, 0];
+  const index = Math.max(
+    0,
+    shape.findIndex(([dx, dy]) => dx === px && dy === py)
+  );
+  const [tx, ty] = getShapeCells(tileType, 0, 0, rotation, mirror)[index];
+  return [pivotX - tx, pivotY - ty];
+}
+
+export function getShapeCellsAroundPivot(
+  tileType: string,
+  pivotX: number,
+  pivotY: number,
+  rotation: number = 0,
+  mirror: boolean = false
+): [number, number][] {
+  const [ax, ay] = pivotToAnchor(tileType, pivotX, pivotY, rotation, mirror);
+  return getShapeCells(tileType, ax, ay, rotation, mirror);
+}
+
 // Order: rotate, then mirror — must match PHP
 export function getShapeCells(
   tileType: string,
