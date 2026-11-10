@@ -354,6 +354,7 @@ export class PlaceTile {
     });
     addButton("↔", _("Mirror"), -diagonal, diagonal, () => {
       this.mirror = !this.mirror;
+      this.rotation = (360 - this.rotation) % 360;
       redraw();
     });
 
