@@ -67,7 +67,7 @@ class Game extends \Bga\GameFramework\Table {
 
         // Init player_state rows — one per player
         foreach (array_keys($players) as $player_id) {
-            static::DbQuery("INSERT INTO `player_state` (`player_id`, `turn_snapshot`) VALUES ('$player_id', '{}')");
+            static::DbQuery("INSERT INTO `player_state` (`player_id`, `turn_snapshot`, `step_snapshots`) VALUES ('$player_id', '{}', '[]')");
         }
 
         // Start the game at NewRound
@@ -105,6 +105,7 @@ class Game extends \Bga\GameFramework\Table {
         );
 
         $result["playerState"] = $this->getObjectFromDb("SELECT * FROM `player_state` WHERE `player_id` = '$currentPlayerId'");
+        unset($result["playerState"]["step_snapshots"]);
 
         $playerBoards = [];
         $players = $this->loadPlayersBasicInfos();
@@ -385,6 +386,7 @@ class Game extends \Bga\GameFramework\Table {
         }
 
         $this->captureTurnBaselineIfNeeded($playerId);
+        $this->pushStepSnapshot($playerId);
 
         // insert into player_cells
         $mirrorInt = $mirror ? 1 : 0;
@@ -436,6 +438,7 @@ class Game extends \Bga\GameFramework\Table {
         }
 
         $this->captureTurnBaselineIfNeeded($playerId);
+        $this->pushStepSnapshot($playerId);
 
         // insert into player_cells
         $mirrorInt = $mirror ? 1 : 0;
@@ -528,6 +531,8 @@ class Game extends \Bga\GameFramework\Table {
         if (!$this->isLegalStreetArtCell($playerId, $x, $y)) {
             throw new UserException(clienttranslate("Illegal street art cell"));
         }
+
+        $this->pushStepSnapshot($playerId);
 
         $state = $this->getObjectFromDb(
             "SELECT `street_art_completed`, `street_art_pending` FROM `player_state` WHERE `player_id` = '$playerId'"
@@ -769,7 +774,7 @@ class Game extends \Bga\GameFramework\Table {
      */
     public function invalidateTurnUndo(int $playerId): void {
         static::DbQuery(
-            "UPDATE `player_state` SET `turn_snapshot` = '{}'
+            "UPDATE `player_state` SET `turn_snapshot` = '{}', `step_snapshots` = '[]'
              WHERE `player_id` = '$playerId'"
         );
     }
@@ -871,6 +876,16 @@ class Game extends \Bga\GameFramework\Table {
     }
 
     public function saveTurnSnapshot(int $playerId): void {
+        $json = static::escapeStringForDB(json_encode($this->buildSnapshot($playerId)));
+        static::DbQuery("UPDATE `player_state` SET `turn_snapshot` = '$json' WHERE `player_id` = '$playerId'");
+        // New turn baseline — older step snapshots are no longer valid
+        $this->clearStepSnapshots($playerId);
+    }
+
+    /**
+     * Current player state + highest placement id, used by both undo variants.
+     */
+    private function buildSnapshot(int $playerId): array {
         $maxPlacementId = (int) $this->getUniqueValueFromDB(
             "SELECT COALESCE(MAX(`placement_id`), 0)
              FROM `player_placements`
@@ -921,8 +936,7 @@ class Game extends \Bga\GameFramework\Table {
             "player_score" => $playerScore,
         ];
 
-        $json = static::escapeStringForDB(json_encode($snapshot));
-        static::DbQuery("UPDATE `player_state` SET `turn_snapshot` = '$json' WHERE `player_id` = '$playerId'");
+        return $snapshot;
     }
 
     public function restoreTurnSnapshot(int $playerId): void {
@@ -933,6 +947,55 @@ class Game extends \Bga\GameFramework\Table {
             throw new UserException(clienttranslate("Nothing to undo"));
         }
 
+        $this->restoreFromSnapshot($playerId, $snapshot);
+        $this->clearStepSnapshots($playerId);
+    }
+
+    // ===== UNDO LAST STEP =====
+
+    private function getStepSnapshots(int $playerId): array {
+        $row = $this->getObjectFromDb("SELECT `step_snapshots` FROM `player_state` WHERE `player_id` = '$playerId'");
+        $steps = json_decode($row["step_snapshots"] ?? "[]", true);
+        return is_array($steps) ? $steps : [];
+    }
+
+    private function setStepSnapshots(int $playerId, array $steps): void {
+        $json = static::escapeStringForDB(json_encode(array_values($steps)));
+        static::DbQuery("UPDATE `player_state` SET `step_snapshots` = '$json' WHERE `player_id` = '$playerId'");
+    }
+
+    public function clearStepSnapshots(int $playerId): void {
+        $this->setStepSnapshots($playerId, []);
+    }
+
+    /**
+     * Call right before a step changes the board (tile, bonus tile, street art).
+     */
+    public function pushStepSnapshot(int $playerId): void {
+        $steps = $this->getStepSnapshots($playerId);
+        $steps[] = $this->buildSnapshot($playerId);
+        $this->setStepSnapshots($playerId, $steps);
+    }
+
+    public function canUndoLastStep(int $playerId): bool {
+        if ($this->hasTurnEnded($playerId)) {
+            return false;
+        }
+        return count($this->getStepSnapshots($playerId)) > 0;
+    }
+
+    public function restoreLastStep(int $playerId): void {
+        $steps = $this->getStepSnapshots($playerId);
+        $snapshot = array_pop($steps);
+        if (!is_array($snapshot) || !isset($snapshot["max_placement_id"])) {
+            throw new UserException(clienttranslate("Nothing to undo"));
+        }
+
+        $this->restoreFromSnapshot($playerId, $snapshot);
+        $this->setStepSnapshots($playerId, $steps);
+    }
+
+    private function restoreFromSnapshot(int $playerId, array $snapshot): void {
         $maxPlacementId = (int) $snapshot["max_placement_id"];
 
         $lastX = $snapshot["last_x"] === null ? "NULL" : "'" . $snapshot["last_x"] . "'";
@@ -1453,14 +1516,20 @@ class Game extends \Bga\GameFramework\Table {
     // ===== DB UPGRADE =====
 
     public function upgradeTableDb($from_version): void {
+        // Each block is idempotent: skip if the column already exists on the live table
         if ($from_version <= 2610071056) {
-            // Idempotent: skip if column already exists on the live table
             $hasColumn = $this->getUniqueValueFromDB("SHOW COLUMNS FROM `player_state` LIKE 'journey_ended'");
-            if ($hasColumn) {
-                return;
+            if (!$hasColumn) {
+                self::applyDbUpgradeToAllDB("ALTER TABLE DBPREFIX_player_state ADD `journey_ended` TINYINT(1) NOT NULL DEFAULT 0");
             }
-            $sql = "ALTER TABLE DBPREFIX_player_state ADD `journey_ended` TINYINT(1) NOT NULL DEFAULT 0";
-            self::applyDbUpgradeToAllDB($sql);
+        }
+        if ($from_version <= 2611102359) {
+            $hasColumn = $this->getUniqueValueFromDB("SHOW COLUMNS FROM `player_state` LIKE 'step_snapshots'");
+            if (!$hasColumn) {
+                // Undo-last stack. Existing rows start empty, so only Undo all works for the running turn.
+                self::applyDbUpgradeToAllDB("ALTER TABLE DBPREFIX_player_state ADD `step_snapshots` MEDIUMTEXT NOT NULL");
+                self::applyDbUpgradeToAllDB("UPDATE DBPREFIX_player_state SET `step_snapshots` = '[]'");
+            }
         }
     }
 }

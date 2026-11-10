@@ -429,6 +429,13 @@ export class PlaceTile {
   private addUndoButtonIfPossible() {
     if (!this.canUndo) return;
     this.bga.statusBar.addActionButton(
+      _("Undo last"),
+      () => {
+        this.bga.actions.performAction("actUndoLast", {});
+      },
+      { color: "secondary" }
+    );
+    this.bga.statusBar.addActionButton(
       _("Undo all"),
       () => {
         this.bga.actions.performAction("actUndo", {});

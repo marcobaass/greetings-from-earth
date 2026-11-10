@@ -105,32 +105,58 @@ class PlaceTile extends GameState {
         }
 
         $this->game->restoreTurnSnapshot($currentPlayerId);
+        $this->notifyUndone($currentPlayerId, clienttranslate('${player_name} undoes the turn'));
 
+        $this->game->keepPlayersInRoundActive(NewRound::class);
+        return null;
+    }
+
+    /**
+     * Undo only the most recent step (tile, bonus tile or street art mark).
+     */
+    #[PossibleAction]
+    public function actUndoLast(int $currentPlayerId): string|null {
+        if ($this->game->hasTurnEnded($currentPlayerId)) {
+            throw new UserException(clienttranslate("You already ended your turn"));
+        }
+        if (!$this->game->canUndoLastStep($currentPlayerId)) {
+            throw new UserException(clienttranslate("Nothing to undo"));
+        }
+
+        $this->game->restoreLastStep($currentPlayerId);
+        $this->notifyUndone($currentPlayerId, clienttranslate('${player_name} undoes the last step'));
+
+        $this->game->keepPlayersInRoundActive(NewRound::class);
+        return null;
+    }
+
+    /**
+     * Send the restored board so the client can redraw it.
+     */
+    private function notifyUndone(int $playerId, string $message): void {
         $coveredCells = $this->game->getObjectListFromDB(
             "SELECT `x`, `y`, `tile_type` FROM `player_cells`
-            WHERE `player_id` = '$currentPlayerId'
+            WHERE `player_id` = '$playerId'
             ORDER BY `x`, `y`"
         );
 
         $placements = $this->game->getObjectListFromDB(
             "SELECT `tile_type`, `x`, `y`, `rotation`, `mirror`
             FROM `player_placements`
-            WHERE `player_id` = '$currentPlayerId'
+            WHERE `player_id` = '$playerId'
             ORDER BY `x`, `y`"
         );
 
-        $playerState = $this->game->getObjectFromDb("SELECT * FROM `player_state` WHERE `player_id` = '$currentPlayerId'");
+        $playerState = $this->game->getObjectFromDb("SELECT * FROM `player_state` WHERE `player_id` = '$playerId'");
+        unset($playerState["step_snapshots"]);
 
-        $this->notify->all("turnUndone", clienttranslate('${player_name} undoes the turn'), [
-            "player_id" => $currentPlayerId,
-            "player_name" => $this->game->getPlayerNameById($currentPlayerId),
+        $this->notify->all("turnUndone", $message, [
+            "player_id" => $playerId,
+            "player_name" => $this->game->getPlayerNameById($playerId),
             "coveredCells" => $coveredCells,
             "placements" => $placements,
             "playerState" => $playerState,
         ]);
-
-        $this->game->keepPlayersInRoundActive(NewRound::class);
-        return null;
     }
 
     /**
