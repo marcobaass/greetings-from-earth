@@ -275,11 +275,15 @@ export class Game {
       const player = gamedatas.players[playerId];
       if (!player) return;
 
+      // Tile choices sit directly above my own board (filled by PlaceTile), not in the action bar
+      const tileTrayHtml = playerId === myId ? `<div id="gfe-tile-tray" class="gfe-tile-tray"></div>` : "";
+
       document.getElementById("gfe-player-boards").insertAdjacentHTML(
         "beforeend",
         `
                 <div id="gfe-board-${playerId}" class="gfe-player-board">
                     <strong>${player.name}</strong>
+                    ${tileTrayHtml}
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
                         <svg id="gfe-tiles-layer-${playerId}" class="gfe-tiles-layer" viewBox="0 0 18 13" preserveAspectRatio="none"></svg>

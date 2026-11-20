@@ -110,6 +110,17 @@ const TILE_PIVOTS = {
     L3: [0, 1],
     SQR6: [0, 1]
 };
+/**
+ * Must match PHP: eScooter grants I4 and Curry Sausage I2 (checkBonusTilesFromCells),
+ * Street Art rewards grant the other shapes (STREET_ART_REWARDS).
+ */
+function getBonusSource(tileType) {
+    if (tileType === "I4")
+        return "escooter";
+    if (tileType === "I2")
+        return "currywurst";
+    return "streetart";
+}
 /** Server anchor (offset [0,0]) for a tile whose pivot cell sits at pivotX/pivotY */
 function pivotToAnchor(tileType, pivotX, pivotY, rotation = 0, mirror = false) {
     const shape = TILE_SHAPES[tileType];
@@ -216,39 +227,25 @@ function squiggleEdge(ax, ay, bx, by) {
     const t = edgeNudge(ax, ay, bx, by);
     return `M ${ax} ${ay} L ${mx + px * t} ${my + py * t} L ${bx} ${by} `;
 }
-function tileButtonHtml(tileType) {
-    const shape = getShapeCells(tileType, 0, 0, 0, false);
-    const outline = cellsToOutlinePath(shape);
+/** Square viewBox `box` cells wide with the shape centred in it */
+function centredViewBox(shape, box) {
     const xs = shape.map(([x]) => x);
     const ys = shape.map(([, y]) => y);
     const minX = Math.min(...xs);
     const minY = Math.min(...ys);
-    const maxX = Math.max(...xs) + 1;
-    const maxY = Math.max(...ys) + 1;
-    const box = 4;
-    const width = maxX - minX;
-    const height = maxY - minY;
-    const originX = minX - (box - width) / 2;
-    const originY = minY - (box - height) / 2;
-    const viewBox = `${originX} ${originY} ${box} ${box}`;
-    return `<svg width="40" height="40" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg"><path d="${outline}" fill="none" stroke="white" stroke-width="0.25"/></svg>`;
+    const width = Math.max(...xs) + 1 - minX;
+    const height = Math.max(...ys) + 1 - minY;
+    return `${minX - (box - width) / 2} ${minY - (box - height) / 2} ${box} ${box}`;
+}
+/** Tile outline for the tile tray — stroked in currentColor, so the CSS picks white or dark per button colour */
+function tileTraySvg(tileType) {
+    const shape = getShapeCells(tileType, 0, 0, 0, false);
+    return `<svg viewBox="${centredViewBox(shape, 4.4)}" xmlns="http://www.w3.org/2000/svg"><path class="gfe-tray-tile-outline" d="${cellsToOutlinePath(shape)}"/></svg>`;
 }
 function tileLogHtml(tileType) {
     const shape = getShapeCells(tileType, 0, 0, 0, false);
     const outline = cellsToOutlinePath(shape);
-    const xs = shape.map(([x]) => x);
-    const ys = shape.map(([, y]) => y);
-    const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
-    const maxX = Math.max(...xs) + 1;
-    const maxY = Math.max(...ys) + 1;
-    const box = 4;
-    const width = maxX - minX;
-    const height = maxY - minY;
-    const originX = minX - (box - width) / 2;
-    const originY = minY - (box - height) / 2;
-    const viewBox = `${originX} ${originY} ${box} ${box}`;
-    return `<span class="gfe-log-tile" title="${tileType}"><svg width="24" height="24" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg"><path d="${outline}" fill="none" stroke="#1a1a1a" stroke-width="0.25"/></svg></span>`;
+    return `<span class="gfe-log-tile" title="${tileType}"><svg width="24" height="24" viewBox="${centredViewBox(shape, 4)}" xmlns="http://www.w3.org/2000/svg"><path d="${outline}" fill="none" stroke="#1a1a1a" stroke-width="0.25"/></svg></span>`;
 }
 
 const TOTAL_ROUNDS = 14;
@@ -382,6 +379,79 @@ function getLegalPlacementHintCells(gamedatas) {
     return collectLegalI1Moves(covered, hasStarted, lastCells);
 }
 
+/**
+ * Own tooltip markup: BGA's default help tooltip (addTooltip) top-aligns a one-word text next to its "?" icon.
+ * Here the "?" badge and the text are centred to each other (see .gfe-tray-tooltip in CSS).
+ */
+function tooltipHtml(text) {
+    const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return `<div class="gfe-tray-tooltip"><span class="gfe-tray-tooltip-icon">?</span><span>${escaped}</span></div>`;
+}
+/**
+ * Tile choices shown directly above the current player's board (instead of in the action bar).
+ * It only ever holds tiles the player can pick right now — otherwise it is empty.
+ * Only the current player's board has a tray, so every method is a no-op for spectators.
+ */
+class TileTray {
+    constructor(gameui) {
+        this.gameui = gameui;
+    }
+    get element() {
+        return document.getElementById("gfe-tile-tray");
+    }
+    /** Replace the tray content with clickable tiles. Each group (dice/bonus, always available) is spaced apart. */
+    render(groups, onPick) {
+        const tray = this.element;
+        if (!tray)
+            return;
+        this.clear();
+        const tooltips = [];
+        groups.forEach((choices, groupIndex) => {
+            if (choices.length === 0)
+                return;
+            const groupEl = document.createElement("div");
+            groupEl.className = "gfe-tile-tray-group";
+            choices.forEach(({ tile, kind, tooltip }, index) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.id = `gfe-tray-tile-${groupIndex}-${index}`;
+                button.className = `gfe-tray-tile gfe-tray-tile-${kind}`;
+                button.dataset.tile = tile;
+                button.setAttribute("aria-pressed", "false");
+                button.innerHTML = tileTraySvg(tile);
+                button.addEventListener("click", () => {
+                    this.select(button);
+                    onPick(tile);
+                });
+                groupEl.appendChild(button);
+                tooltips.push([button.id, tooltip]);
+            });
+            tray.appendChild(groupEl);
+        });
+        // BGA tooltips attach by id, so the buttons have to be in the page first
+        tooltips.forEach(([id, tooltip]) => this.gameui.addTooltipHtml(id, tooltipHtml(tooltip)));
+    }
+    /** Highlight the tile that was picked up — tracked per button, since the same tile type can appear twice */
+    select(button) {
+        const tray = this.element;
+        if (!tray)
+            return;
+        tray.querySelectorAll(".gfe-tray-tile").forEach((other) => {
+            const selected = other === button;
+            other.classList.toggle("gfe-tray-tile-selected", selected);
+            other.setAttribute("aria-pressed", String(selected));
+        });
+    }
+    /** Nothing to pick right now. The tray keeps its height (see CSS), so the board doesn't jump. */
+    clear() {
+        const tray = this.element;
+        if (!tray)
+            return;
+        tray.querySelectorAll(".gfe-tray-tile").forEach((button) => this.gameui.removeTooltip(button.id));
+        tray.replaceChildren();
+    }
+}
+
 /** Distance (in cells) from the pivot centre to the control buttons */
 const RING_RADIUS = 3.2;
 const GRID_COLS = 18;
@@ -461,6 +531,7 @@ class PlaceTile {
             streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
             streetArtGrid.removeEventListener("click", this.onStreetArtClick);
         }
+        this.tileTray.clear();
         // forgets which tile player picked up and where
         this.resetPlacementState();
     }
@@ -560,7 +631,6 @@ class PlaceTile {
         if (!this.followingMouse) {
             this.addButtonsForTile(legal, grid);
         }
-        this.updateActionButtons(legal, grid);
     }
     /**
      * Fixed control ring centred on the pivot cell — it only moves with the arrow buttons,
@@ -643,21 +713,36 @@ class PlaceTile {
         grid.classList.add("gfe-play-grid-interactive");
         this.showPreview(grid, tile, 0, 0);
     }
-    updateActionButtons(legal, grid) {
-        this.bga.statusBar.removeActionButtons();
+    /**
+     * Fill the tray above my board with the tiles I can pick right now: this turn's dice tiles
+     * (or the bonus tiles during a bonus step) plus the always-available I1/I2.
+     * Rendered once per step — never on mouse move.
+     */
+    showTileChoices() {
         if (!this.placeTileArgs)
             return;
-        const mainTiles = this.pendingTiles.length > 0 ? this.pendingTiles : this.placeTileArgs.tileOptions;
-        mainTiles.forEach((tile) => {
-            this.bga.statusBar.addActionButton(tileButtonHtml(tile), () => {
+        // Bonus tiles show where they came from: name (hover) and colour from the sheet
+        const bonusNames = {
+            escooter: _("eScooter"),
+            currywurst: _("Curry Sausage"),
+            streetart: _("Street Art")
+        };
+        const mainChoices = this.pendingTiles.length > 0
+            ? this.pendingTiles.map((tile) => {
+                const source = getBonusSource(tile);
+                return { tile, kind: source, tooltip: bonusNames[source] };
+            })
+            : this.placeTileArgs.tileOptions.map((tile) => ({ tile, kind: "dice", tooltip: _("This turn") }));
+        const alwaysChoices = this.placeTileArgs.alwaysAvailableTiles.map((tile) => ({ tile, kind: "always", tooltip: _("Always available") }));
+        this.tileTray.render([mainChoices, alwaysChoices], (tile) => {
+            const grid = document.getElementById(`gfe-play-grid-${this.bga.players.getCurrentPlayerId()}`);
+            if (grid)
                 this.selectTile(tile, grid);
-            });
         });
-        this.placeTileArgs.alwaysAvailableTiles.forEach((tile) => {
-            this.bga.statusBar.addActionButton(tileButtonHtml(tile), () => {
-                this.selectTile(tile, grid);
-            }, { color: "secondary" });
-        });
+    }
+    /** The action bar only keeps instructions and global actions */
+    renderStatusButtons() {
+        this.bga.statusBar.removeActionButtons();
         this.addUndoButtonIfPossible();
     }
     setCanUndo(value) {
@@ -697,7 +782,8 @@ class PlaceTile {
         grid.addEventListener("click", this.onGridClick);
         grid.addEventListener("mousemove", this.onMouseMove);
         this.bga.statusBar.setTitle(_("${you} must place your bonus tile on the map"));
-        this.updateActionButtons(false, grid);
+        this.showTileChoices();
+        this.renderStatusButtons();
     }
     clearPendingTiles() {
         this.pendingTiles = [];
@@ -706,6 +792,7 @@ class PlaceTile {
     showStreetArtChoose() {
         this.clearPendingTiles();
         this.resetPlacementState();
+        this.tileTray.clear();
         const playerId = this.bga.players.getCurrentPlayerId();
         const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
@@ -719,8 +806,7 @@ class PlaceTile {
         if (!streetArtGrid)
             return;
         this.bga.statusBar.setTitle(_("${you} must mark a street art bonus"));
-        this.bga.statusBar.removeActionButtons();
-        this.addUndoButtonIfPossible();
+        this.renderStatusButtons();
         streetArtGrid.removeEventListener("click", this.onStreetArtClick);
         streetArtGrid.classList.add("gfe-street-art-choose-interactive");
         streetArtGrid.addEventListener("click", this.onStreetArtClick);
@@ -737,6 +823,7 @@ class PlaceTile {
         return value === false;
     }
     showEndJourneyUi() {
+        this.tileTray.clear();
         this.bga.statusBar.removeActionButtons();
         this.bga.statusBar.setTitle(_("No legal placement left — your journey ends here"));
         this.bga.statusBar.addActionButton(_("End journey"), () => {
@@ -747,6 +834,7 @@ class PlaceTile {
         this.clearPendingTiles();
         this.resetPlacementState();
         this.awaitingEndTurn = true;
+        this.tileTray.clear();
         const playerId = this.bga.players.getCurrentPlayerId();
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
         const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
@@ -858,9 +946,12 @@ class PlaceTile {
         };
         this.rotation = 0;
         this.mirror = false;
+        this.tileTray = new TileTray(bga.gameui);
     }
     onEnteringState(args, isCurrentPlayerActive) {
         this.placeTileArgs = args;
+        // Only tiles I can actually pick are shown — the steps below fill the tray when that's the case
+        this.tileTray.clear();
         if (isCurrentPlayerActive && this.isStuckWithNoLegalI1()) {
             this.showEndJourneyUi();
             return;
@@ -896,7 +987,8 @@ class PlaceTile {
             grid.removeEventListener("mousemove", this.onMouseMove);
             grid.addEventListener("click", this.onGridClick);
             grid.addEventListener("mousemove", this.onMouseMove);
-            this.updateActionButtons(false, grid);
+            this.showTileChoices();
+            this.renderStatusButtons();
         }
     }
     onLeavingState(args, isCurrentPlayerActive) {
@@ -1279,9 +1371,12 @@ class Game {
             const player = gamedatas.players[playerId];
             if (!player)
                 return;
+            // Tile choices sit directly above my own board (filled by PlaceTile), not in the action bar
+            const tileTrayHtml = playerId === myId ? `<div id="gfe-tile-tray" class="gfe-tile-tray"></div>` : "";
             document.getElementById("gfe-player-boards").insertAdjacentHTML("beforeend", `
                 <div id="gfe-board-${playerId}" class="gfe-player-board">
                     <strong>${player.name}</strong>
+                    ${tileTrayHtml}
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
                         <svg id="gfe-tiles-layer-${playerId}" class="gfe-tiles-layer" viewBox="0 0 18 13" preserveAspectRatio="none"></svg>

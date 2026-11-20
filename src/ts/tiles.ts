@@ -73,6 +73,19 @@ export const TILE_PIVOTS: Record<string, [number, number]> = {
   SQR6: [0, 1]
 };
 
+/** Where a bonus tile comes from — shown in the tile tray with its name and colour from the sheet */
+export type BonusSource = "escooter" | "currywurst" | "streetart";
+
+/**
+ * Must match PHP: eScooter grants I4 and Curry Sausage I2 (checkBonusTilesFromCells),
+ * Street Art rewards grant the other shapes (STREET_ART_REWARDS).
+ */
+export function getBonusSource(tileType: string): BonusSource {
+  if (tileType === "I4") return "escooter";
+  if (tileType === "I2") return "currywurst";
+  return "streetart";
+}
+
 /** Server anchor (offset [0,0]) for a tile whose pivot cell sits at pivotX/pivotY */
 export function pivotToAnchor(
   tileType: string,
@@ -212,46 +225,27 @@ function squiggleEdge(ax: number, ay: number, bx: number, by: number): string {
   return `M ${ax} ${ay} L ${mx + px * t} ${my + py * t} L ${bx} ${by} `;
 }
 
-export function tileButtonHtml(tileType: string) {
-  const shape = getShapeCells(tileType, 0, 0, 0, false);
-  const outline = cellsToOutlinePath(shape);
-
+/** Square viewBox `box` cells wide with the shape centred in it */
+function centredViewBox(shape: [number, number][], box: number): string {
   const xs = shape.map(([x]) => x);
   const ys = shape.map(([, y]) => y);
   const minX = Math.min(...xs);
   const minY = Math.min(...ys);
-  const maxX = Math.max(...xs) + 1;
-  const maxY = Math.max(...ys) + 1;
+  const width = Math.max(...xs) + 1 - minX;
+  const height = Math.max(...ys) + 1 - minY;
+  return `${minX - (box - width) / 2} ${minY - (box - height) / 2} ${box} ${box}`;
+}
 
-  const box = 4;
+/** Tile outline for the tile tray — stroked in currentColor, so the CSS picks white or dark per button colour */
+export function tileTraySvg(tileType: string) {
+  const shape = getShapeCells(tileType, 0, 0, 0, false);
 
-  const width = maxX - minX;
-  const height = maxY - minY;
-  const originX = minX - (box - width) / 2;
-  const originY = minY - (box - height) / 2;
-
-  const viewBox = `${originX} ${originY} ${box} ${box}`;
-
-  return `<svg width="40" height="40" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg"><path d="${outline}" fill="none" stroke="white" stroke-width="0.25"/></svg>`;
+  return `<svg viewBox="${centredViewBox(shape, 4.4)}" xmlns="http://www.w3.org/2000/svg"><path class="gfe-tray-tile-outline" d="${cellsToOutlinePath(shape)}"/></svg>`;
 }
 
 export function tileLogHtml(tileType: string) {
   const shape = getShapeCells(tileType, 0, 0, 0, false);
   const outline = cellsToOutlinePath(shape);
 
-  const xs = shape.map(([x]) => x);
-  const ys = shape.map(([, y]) => y);
-  const minX = Math.min(...xs);
-  const minY = Math.min(...ys);
-  const maxX = Math.max(...xs) + 1;
-  const maxY = Math.max(...ys) + 1;
-
-  const box = 4;
-  const width = maxX - minX;
-  const height = maxY - minY;
-  const originX = minX - (box - width) / 2;
-  const originY = minY - (box - height) / 2;
-  const viewBox = `${originX} ${originY} ${box} ${box}`;
-
-  return `<span class="gfe-log-tile" title="${tileType}"><svg width="24" height="24" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg"><path d="${outline}" fill="none" stroke="#1a1a1a" stroke-width="0.25"/></svg></span>`;
+  return `<span class="gfe-log-tile" title="${tileType}"><svg width="24" height="24" viewBox="${centredViewBox(shape, 4)}" xmlns="http://www.w3.org/2000/svg"><path d="${outline}" fill="none" stroke="#1a1a1a" stroke-width="0.25"/></svg></span>`;
 }

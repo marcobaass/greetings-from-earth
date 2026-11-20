@@ -1,6 +1,15 @@
 import { Game } from "../Game";
 import { isPlacementLegal, canI1BePlaced, getLegalPlacementHintCells } from "../placement";
-import { computeTileShift, getShapeCellsAroundPivot, pivotToAnchor, isInsideGrid, cellsToOutlinePath, tileButtonHtml } from "../tiles";
+import {
+  computeTileShift,
+  getShapeCellsAroundPivot,
+  pivotToAnchor,
+  isInsideGrid,
+  cellsToOutlinePath,
+  getBonusSource,
+  BonusSource
+} from "../tiles";
+import { TileTray, TileChoice } from "../tileTray";
 
 /** Distance (in cells) from the pivot centre to the control buttons */
 const RING_RADIUS = 3.2;
@@ -21,6 +30,8 @@ export class PlaceTile {
   /** Server forecast: I1 path exists for remaining rounds. null = recompute locally. */
   private canSurviveRemaining: boolean | null = null;
   private followingMouse = false;
+  /** Tile choices above my board — the action bar only keeps instructions and global actions */
+  private tileTray: TileTray;
 
   private onGridClick = (event: MouseEvent) => {
     const cell = event.target as HTMLElement;
@@ -176,6 +187,8 @@ export class PlaceTile {
       streetArtGrid.removeEventListener("click", this.onStreetArtClick);
     }
 
+    this.tileTray.clear();
+
     // forgets which tile player picked up and where
     this.resetPlacementState();
   }
@@ -296,7 +309,6 @@ export class PlaceTile {
     if (!this.followingMouse) {
       this.addButtonsForTile(legal, grid);
     }
-    this.updateActionButtons(legal, grid);
   }
 
   /**
@@ -396,29 +408,42 @@ export class PlaceTile {
     this.showPreview(grid, tile, 0, 0);
   }
 
-  private updateActionButtons(legal: boolean, grid: HTMLElement) {
-    this.bga.statusBar.removeActionButtons();
-
+  /**
+   * Fill the tray above my board with the tiles I can pick right now: this turn's dice tiles
+   * (or the bonus tiles during a bonus step) plus the always-available I1/I2.
+   * Rendered once per step — never on mouse move.
+   */
+  private showTileChoices() {
     if (!this.placeTileArgs) return;
 
-    const mainTiles = this.pendingTiles.length > 0 ? this.pendingTiles : this.placeTileArgs.tileOptions;
+    // Bonus tiles show where they came from: name (hover) and colour from the sheet
+    const bonusNames: Record<BonusSource, string> = {
+      escooter: _("eScooter"),
+      currywurst: _("Curry Sausage"),
+      streetart: _("Street Art")
+    };
 
-    mainTiles.forEach((tile) => {
-      this.bga.statusBar.addActionButton(tileButtonHtml(tile), () => {
-        this.selectTile(tile, grid);
-      });
+    const mainChoices =
+      this.pendingTiles.length > 0
+        ? this.pendingTiles.map((tile): TileChoice => {
+            const source = getBonusSource(tile);
+            return { tile, kind: source, tooltip: bonusNames[source] };
+          })
+        : this.placeTileArgs.tileOptions.map((tile): TileChoice => ({ tile, kind: "dice", tooltip: _("This turn") }));
+
+    const alwaysChoices = this.placeTileArgs.alwaysAvailableTiles.map(
+      (tile): TileChoice => ({ tile, kind: "always", tooltip: _("Always available") })
+    );
+
+    this.tileTray.render([mainChoices, alwaysChoices], (tile) => {
+      const grid = document.getElementById(`gfe-play-grid-${this.bga.players.getCurrentPlayerId()}`);
+      if (grid) this.selectTile(tile, grid);
     });
+  }
 
-    this.placeTileArgs.alwaysAvailableTiles.forEach((tile) => {
-      this.bga.statusBar.addActionButton(
-        tileButtonHtml(tile),
-        () => {
-          this.selectTile(tile, grid);
-        },
-        { color: "secondary" }
-      );
-    });
-
+  /** The action bar only keeps instructions and global actions */
+  private renderStatusButtons() {
+    this.bga.statusBar.removeActionButtons();
     this.addUndoButtonIfPossible();
   }
 
@@ -474,7 +499,8 @@ export class PlaceTile {
     grid.addEventListener("mousemove", this.onMouseMove);
 
     this.bga.statusBar.setTitle(_("${you} must place your bonus tile on the map"));
-    this.updateActionButtons(false, grid);
+    this.showTileChoices();
+    this.renderStatusButtons();
   }
 
   public clearPendingTiles() {
@@ -485,6 +511,7 @@ export class PlaceTile {
   public showStreetArtChoose() {
     this.clearPendingTiles();
     this.resetPlacementState();
+    this.tileTray.clear();
 
     const playerId = this.bga.players.getCurrentPlayerId();
     const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
@@ -501,8 +528,7 @@ export class PlaceTile {
     if (!streetArtGrid) return;
 
     this.bga.statusBar.setTitle(_("${you} must mark a street art bonus"));
-    this.bga.statusBar.removeActionButtons();
-    this.addUndoButtonIfPossible();
+    this.renderStatusButtons();
 
     streetArtGrid.removeEventListener("click", this.onStreetArtClick);
     streetArtGrid.classList.add("gfe-street-art-choose-interactive");
@@ -521,6 +547,7 @@ export class PlaceTile {
   }
 
   private showEndJourneyUi() {
+    this.tileTray.clear();
     this.bga.statusBar.removeActionButtons();
     this.bga.statusBar.setTitle(_("No legal placement left — your journey ends here"));
     this.bga.statusBar.addActionButton(_("End journey"), () => {
@@ -532,6 +559,7 @@ export class PlaceTile {
     this.clearPendingTiles();
     this.resetPlacementState();
     this.awaitingEndTurn = true;
+    this.tileTray.clear();
 
     const playerId = this.bga.players.getCurrentPlayerId();
     const grid = document.getElementById(`gfe-play-grid-${playerId}`);
@@ -567,10 +595,15 @@ export class PlaceTile {
   constructor(
     private game: Game,
     private bga: Bga<GreetingsFromEarthPlayer, GreetingsFromEarthGamedatas>
-  ) {}
+  ) {
+    this.tileTray = new TileTray(bga.gameui);
+  }
 
   onEnteringState(args: PlaceTileArgs, isCurrentPlayerActive: boolean) {
     this.placeTileArgs = args;
+
+    // Only tiles I can actually pick are shown — the steps below fill the tray when that's the case
+    this.tileTray.clear();
 
     if (isCurrentPlayerActive && this.isStuckWithNoLegalI1()) {
       this.showEndJourneyUi();
@@ -618,7 +651,8 @@ export class PlaceTile {
       grid.removeEventListener("mousemove", this.onMouseMove);
       grid.addEventListener("click", this.onGridClick);
       grid.addEventListener("mousemove", this.onMouseMove);
-      this.updateActionButtons(false, grid);
+      this.showTileChoices();
+      this.renderStatusButtons();
     }
   }
 
