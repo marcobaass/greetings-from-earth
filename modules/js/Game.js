@@ -23,6 +23,40 @@ const cellKey = (x, y) => `${x},${y}`;
 const getCellType = (x, y) => {
     return BERLIN_MAP[y][x];
 };
+// Street art grid (4 columns × 5 rows) — mirrors BERLIN_STREET_ART_MAP in constants.inc.php
+const STREET_ART_START = 0;
+const BERLIN_STREET_ART_MAP = [
+    [10, 3, 4, 4], // y=0
+    [2, 2, 3, 9], // y=1
+    [1, 8, 2, 3], // y=2
+    [5, 1, 6, 2], // y=3
+    [0, 1, 1, 7], // y=4
+];
+/**
+ * Street art cells the player may mark next — mirrors Game::isLegalStreetArtCell (PHP):
+ * not the start cell, not yet marked, orthogonally adjacent to the start cell or a marked cell.
+ */
+function getLegalStreetArtCells(completed) {
+    const marked = new Set(completed);
+    const references = new Set(completed);
+    for (let y = 0; y < BERLIN_STREET_ART_MAP.length; y++) {
+        for (let x = 0; x < BERLIN_STREET_ART_MAP[y].length; x++) {
+            if (BERLIN_STREET_ART_MAP[y][x] === STREET_ART_START)
+                references.add(cellKey(x, y));
+        }
+    }
+    const legal = [];
+    for (let y = 0; y < BERLIN_STREET_ART_MAP.length; y++) {
+        for (let x = 0; x < BERLIN_STREET_ART_MAP[y].length; x++) {
+            if (BERLIN_STREET_ART_MAP[y][x] === STREET_ART_START || marked.has(cellKey(x, y)))
+                continue;
+            const neighbours = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]];
+            if (neighbours.some(([nx, ny]) => references.has(cellKey(nx, ny))))
+                legal.push([x, y]);
+        }
+    }
+    return legal;
+}
 // getSbahnCellSet() → Set of "x,y" for all SBAHN cells
 function getSbahnCellSet() {
     const refs = new Set();
@@ -516,10 +550,19 @@ class PlaceTile {
         this.rotation = 0;
         this.mirror = false;
     }
+    /** Street art grid back to passive: no click handler, no legal highlights */
+    hideStreetArtChoose() {
+        const playerId = this.bga.players.getCurrentPlayerId();
+        const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
+        if (!streetArtGrid)
+            return;
+        streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
+        streetArtGrid.removeEventListener("click", this.onStreetArtClick);
+        streetArtGrid.querySelectorAll(".gfe-street-art-legal").forEach((el) => el.classList.remove("gfe-street-art-legal"));
+    }
     cleanupActivePlayer() {
         const playerId = this.bga.players.getCurrentPlayerId();
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-        const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
         if (grid) {
             this.cleanUpPreview(grid);
             grid.classList.remove("gfe-play-grid-interactive");
@@ -527,10 +570,7 @@ class PlaceTile {
             grid.removeEventListener("mousemove", this.onMouseMove);
             this.clearLegalHints(grid);
         }
-        if (streetArtGrid) {
-            streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
-            streetArtGrid.removeEventListener("click", this.onStreetArtClick);
-        }
+        this.hideStreetArtChoose();
         this.tileTray.clear();
         // forgets which tile player picked up and where
         this.resetPlacementState();
@@ -767,13 +807,9 @@ class PlaceTile {
         this.resetPlacementState();
         const playerId = this.bga.players.getCurrentPlayerId();
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-        const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
         if (!grid)
             return;
-        if (streetArtGrid) {
-            streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
-            streetArtGrid.removeEventListener("click", this.onStreetArtClick);
-        }
+        this.hideStreetArtChoose();
         this.cleanUpPreview(grid);
         this.showLegalHints(grid);
         // street art step removes the grid handler — put it back so bonus tiles can be positioned
@@ -807,6 +843,12 @@ class PlaceTile {
             return;
         this.bga.statusBar.setTitle(_("${you} must mark a street art bonus"));
         this.renderStatusButtons();
+        // Highlight only the cells the player may actually mark (same rule as the server)
+        streetArtGrid.querySelectorAll(".gfe-street-art-legal").forEach((el) => el.classList.remove("gfe-street-art-legal"));
+        const completed = JSON.parse(String(this.bga.gameui.gamedatas.playerState.street_art_completed || "[]"));
+        for (const [x, y] of getLegalStreetArtCells(completed)) {
+            streetArtGrid.querySelector(`.gfe-street-art-choose-cell[data-x="${x}"][data-y="${y}"]`)?.classList.add("gfe-street-art-legal");
+        }
         streetArtGrid.removeEventListener("click", this.onStreetArtClick);
         streetArtGrid.classList.add("gfe-street-art-choose-interactive");
         streetArtGrid.addEventListener("click", this.onStreetArtClick);
@@ -837,7 +879,6 @@ class PlaceTile {
         this.tileTray.clear();
         const playerId = this.bga.players.getCurrentPlayerId();
         const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-        const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
         if (grid) {
             this.cleanUpPreview(grid);
             grid.classList.remove("gfe-play-grid-interactive");
@@ -845,10 +886,7 @@ class PlaceTile {
             grid.removeEventListener("mousemove", this.onMouseMove);
             this.clearLegalHints(grid);
         }
-        if (streetArtGrid) {
-            streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
-            streetArtGrid.removeEventListener("click", this.onStreetArtClick);
-        }
+        this.hideStreetArtChoose();
         this.bga.statusBar.removeActionButtons();
         // Forecast disabled — always allow End turn; End journey handles no-I1.
         // const canSurvive = this.canSurviveRemaining ?? canI1BePlaced(this.bga.gameui.gamedatas);
@@ -934,6 +972,9 @@ class PlaceTile {
         this.onStreetArtClick = (event) => {
             const cell = event.target;
             if (!(cell instanceof HTMLElement) || !cell.classList.contains("gfe-street-art-choose-cell"))
+                return;
+            // only highlighted cells are clickable — no server round trip / error for illegal ones
+            if (!cell.classList.contains("gfe-street-art-legal"))
                 return;
             const x = Number(cell.dataset.x);
             const y = Number(cell.dataset.y);
@@ -1187,17 +1228,24 @@ class Game {
         this.bga.states.register("PlaceBonus", this.placeBonus);
     }
     // ===== RENDERING =====
-    renderScribbleCircle(animate = false) {
-        return `<svg viewBox="0 0 500 500">
-            <path
-              class="gfe-scribble-circle ${animate ? "gfe-circle-draw" : ""}"              
+    /**
+     * Hand-drawn circle. With `outline`, a wider dark stroke is drawn underneath so bright
+     * colours (yellow, spring green, …) stay visible on the light map.
+     */
+    renderScribbleCircle(animate = false, color = "black", outline = false) {
+        const cls = `gfe-scribble-circle ${animate ? "gfe-circle-draw" : ""}`;
+        const path = (stroke, width) => `<path
+              class="${cls}"
               fill="none"
-              stroke="black"
-              stroke-width="50"
+              stroke="${stroke}"
+              stroke-width="${width}"
               stroke-linecap="round"
               stroke-linejoin="round"
               d="M 27.189 195.683 C 30.061 131.618 94.099 84.3 117.657 68.019 C 140.551 52.197 213.962 25.065 280.326 36.589 C 395.932 56.664 426.688 110.248 442.969 138.089 C 490.779 219.846 479.422 338.99 437.633 396.353 C 370.052 489.119 283.113 479.008 177.507 461.765 C 134.745 454.134 75.723 435.929 52.6 350.834 C 42.992 317.513 51.203 254.43 68.837 228.121"
-            />
+            />`;
+        return `<svg viewBox="0 0 500 500">
+            ${outline ? path("#1a1a1a", 74) : ""}
+            ${path(color, 50)}
           </svg>`;
     }
     /** True only when this track already had a known count and it went up (skips first paint / same-count redraws). */
@@ -1205,6 +1253,20 @@ class Game {
         const prev = this.scribbleCounts.get(key);
         this.scribbleCounts.set(key, count);
         return prev !== undefined && count > prev;
+    }
+    /** Player's BGA colour as CSS hex (BGA stores it without "#") */
+    getPlayerColor(playerId) {
+        const color = this.gamedatas.players[playerId]?.color;
+        return color ? `#${color}` : "black";
+    }
+    /** True for bright colours (yellow, spring green, …) that need a dark outline to stay readable */
+    isLightColor(hex) {
+        const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+        if (!m)
+            return false;
+        const [r, g, b] = m.slice(1).map((c) => parseInt(c, 16));
+        // > 150 catches yellow, orange, spring green and hot pink from the player colour list
+        return 0.299 * r + 0.587 * g + 0.114 * b > 150;
     }
     renderRoundTracker(playerId, round) {
         const roundTracker = document.getElementById(`gfe-round-tracker-${playerId}`);
@@ -1227,9 +1289,11 @@ class Game {
             { top: 26.9, left: 91.9 }
         ];
         const animateLast = this.shouldAnimateScribble(`${playerId}-round`, round);
+        const playerColor = this.getPlayerColor(playerId);
+        const outline = this.isLightColor(playerColor);
         roundTracker.innerHTML = "";
         for (let i = 0; i < round; i++) {
-            roundTracker.innerHTML += `<div class="gfe-round-tracker-circle" style="top: ${ROUNDS_POSITIONS[i].top}%; left: ${ROUNDS_POSITIONS[i].left}%">${this.renderScribbleCircle(animateLast && i === round - 1)}</div>`;
+            roundTracker.innerHTML += `<div class="gfe-round-tracker-circle" style="top: ${ROUNDS_POSITIONS[i].top}%; left: ${ROUNDS_POSITIONS[i].left}%">${this.renderScribbleCircle(animateLast && i === round - 1, playerColor, outline)}</div>`;
         }
     }
     renderCoveredCells(playerId, coveredCells) {
@@ -1344,10 +1408,13 @@ class Game {
     // This is called when the game is setup
     setup(gamedatas) {
         this.gamedatas = gamedatas;
+        // Round info sits above my own board, so it takes my colour (spectators: black)
+        const roundInfoColor = this.getPlayerColor(this.bga.players.getCurrentPlayerId());
+        const roundInfoClasses = this.isLightColor(roundInfoColor) ? "gfe-text-outline" : "";
         // Set up the game area
         this.bga.gameArea.getElement().insertAdjacentHTML("beforeend", `
             <div id="gfe-game-area">
-                <div id="gfe-round-info">
+                <div id="gfe-round-info" class="${roundInfoClasses}" style="color: ${roundInfoColor}">
                     Round: <span id="gfe-round">${gamedatas.currentRound}</span> / 14
                 </div>
                 <div id="gfe-player-boards"></div>
@@ -1373,9 +1440,11 @@ class Game {
                 return;
             // Tile choices sit directly above my own board (filled by PlaceTile), not in the action bar
             const tileTrayHtml = playerId === myId ? `<div id="gfe-tile-tray" class="gfe-tile-tray"></div>` : "";
+            const playerColor = this.getPlayerColor(playerId);
+            const nameClasses = `gfe-player-name${this.isLightColor(playerColor) ? " gfe-text-outline" : ""}`;
             document.getElementById("gfe-player-boards").insertAdjacentHTML("beforeend", `
                 <div id="gfe-board-${playerId}" class="gfe-player-board">
-                    <strong>${player.name}</strong>
+                    <strong class="${nameClasses}" style="color: ${playerColor}">${player.name}</strong>
                     ${tileTrayHtml}
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
@@ -1640,6 +1709,8 @@ class Game {
         const ps = this.bga.gameui.gamedatas.playerState;
         const mustsee = JSON.parse(String(ps.mustsee_completed || "[]"));
         this.bga.gameui.gamedatas.playerState.street_art_score = args.street_art_score;
+        // keep client memory in sync — the legal street art hints are computed from it
+        ps.street_art_completed = JSON.stringify(args.street_art_completed ?? []);
         this.renderMustSeeUfoTrack(args.player_id, ps.ufo_count, mustsee.length, ps.mustsee_score, ps.ufo_score, ps.monument_collection_score, ps.street_art_score);
         this.renderStreetArtTrack(args.player_id, args.street_art_completed, args.street_art_score);
         this.continueAfterPlacement(args.player_id, args.street_art_pending ?? 0, args.pending_tiles ?? [], !!args.awaiting_turn_confirm, args.can_survive_remaining, args.has_legal_i1_move);

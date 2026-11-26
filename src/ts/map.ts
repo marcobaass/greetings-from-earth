@@ -28,6 +28,40 @@ export const getCellType = (x: number, y: number) => {
     return BERLIN_MAP[y][x]
 }
 
+// Street art grid (4 columns × 5 rows) — mirrors BERLIN_STREET_ART_MAP in constants.inc.php
+const STREET_ART_START = 0
+const BERLIN_STREET_ART_MAP = [
+    [10, 3, 4, 4], // y=0
+    [2, 2, 3, 9],  // y=1
+    [1, 8, 2, 3],  // y=2
+    [5, 1, 6, 2],  // y=3
+    [0, 1, 1, 7],  // y=4
+]
+
+/**
+ * Street art cells the player may mark next — mirrors Game::isLegalStreetArtCell (PHP):
+ * not the start cell, not yet marked, orthogonally adjacent to the start cell or a marked cell.
+ */
+export function getLegalStreetArtCells(completed: string[]): [number, number][] {
+    const marked = new Set(completed)
+    const references = new Set(completed)
+    for (let y = 0; y < BERLIN_STREET_ART_MAP.length; y++) {
+        for (let x = 0; x < BERLIN_STREET_ART_MAP[y].length; x++) {
+            if (BERLIN_STREET_ART_MAP[y][x] === STREET_ART_START) references.add(cellKey(x, y))
+        }
+    }
+
+    const legal: [number, number][] = []
+    for (let y = 0; y < BERLIN_STREET_ART_MAP.length; y++) {
+        for (let x = 0; x < BERLIN_STREET_ART_MAP[y].length; x++) {
+            if (BERLIN_STREET_ART_MAP[y][x] === STREET_ART_START || marked.has(cellKey(x, y))) continue
+            const neighbours = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]
+            if (neighbours.some(([nx, ny]) => references.has(cellKey(nx, ny)))) legal.push([x, y])
+        }
+    }
+    return legal
+}
+
 // getSbahnCellSet() → Set of "x,y" for all SBAHN cells
 export function getSbahnCellSet() {
     const refs = new Set<string>()

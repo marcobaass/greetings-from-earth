@@ -10,6 +10,7 @@ import {
   BonusSource
 } from "../tiles";
 import { TileTray, TileChoice } from "../tileTray";
+import { getLegalStreetArtCells } from "../map";
 
 /** Distance (in cells) from the pivot centre to the control buttons */
 const RING_RADIUS = 3.2;
@@ -92,6 +93,8 @@ export class PlaceTile {
     const cell = event.target as HTMLElement;
 
     if (!(cell instanceof HTMLElement) || !cell.classList.contains("gfe-street-art-choose-cell")) return;
+    // only highlighted cells are clickable — no server round trip / error for illegal ones
+    if (!cell.classList.contains("gfe-street-art-legal")) return;
 
     const x = Number(cell.dataset.x);
     const y = Number(cell.dataset.y);
@@ -169,10 +172,20 @@ export class PlaceTile {
     this.mirror = false;
   }
 
+  /** Street art grid back to passive: no click handler, no legal highlights */
+  private hideStreetArtChoose() {
+    const playerId = this.bga.players.getCurrentPlayerId();
+    const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
+    if (!streetArtGrid) return;
+
+    streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
+    streetArtGrid.removeEventListener("click", this.onStreetArtClick);
+    streetArtGrid.querySelectorAll(".gfe-street-art-legal").forEach((el) => el.classList.remove("gfe-street-art-legal"));
+  }
+
   private cleanupActivePlayer() {
     const playerId = this.bga.players.getCurrentPlayerId();
     const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-    const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
 
     if (grid) {
       this.cleanUpPreview(grid);
@@ -182,10 +195,7 @@ export class PlaceTile {
       this.clearLegalHints(grid);
     }
 
-    if (streetArtGrid) {
-      streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
-      streetArtGrid.removeEventListener("click", this.onStreetArtClick);
-    }
+    this.hideStreetArtChoose();
 
     this.tileTray.clear();
 
@@ -481,13 +491,9 @@ export class PlaceTile {
 
     const playerId = this.bga.players.getCurrentPlayerId();
     const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-    const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
     if (!grid) return;
 
-    if (streetArtGrid) {
-      streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
-      streetArtGrid.removeEventListener("click", this.onStreetArtClick);
-    }
+    this.hideStreetArtChoose();
 
     this.cleanUpPreview(grid);
     this.showLegalHints(grid);
@@ -530,6 +536,13 @@ export class PlaceTile {
     this.bga.statusBar.setTitle(_("${you} must mark a street art bonus"));
     this.renderStatusButtons();
 
+    // Highlight only the cells the player may actually mark (same rule as the server)
+    streetArtGrid.querySelectorAll(".gfe-street-art-legal").forEach((el) => el.classList.remove("gfe-street-art-legal"));
+    const completed = JSON.parse(String(this.bga.gameui.gamedatas.playerState.street_art_completed || "[]")) as string[];
+    for (const [x, y] of getLegalStreetArtCells(completed)) {
+      streetArtGrid.querySelector(`.gfe-street-art-choose-cell[data-x="${x}"][data-y="${y}"]`)?.classList.add("gfe-street-art-legal");
+    }
+
     streetArtGrid.removeEventListener("click", this.onStreetArtClick);
     streetArtGrid.classList.add("gfe-street-art-choose-interactive");
     streetArtGrid.addEventListener("click", this.onStreetArtClick);
@@ -563,7 +576,6 @@ export class PlaceTile {
 
     const playerId = this.bga.players.getCurrentPlayerId();
     const grid = document.getElementById(`gfe-play-grid-${playerId}`);
-    const streetArtGrid = document.getElementById(`gfe-street-art-choose-${playerId}`);
 
     if (grid) {
       this.cleanUpPreview(grid);
@@ -573,10 +585,7 @@ export class PlaceTile {
       this.clearLegalHints(grid);
     }
 
-    if (streetArtGrid) {
-      streetArtGrid.classList.remove("gfe-street-art-choose-interactive");
-      streetArtGrid.removeEventListener("click", this.onStreetArtClick);
-    }
+    this.hideStreetArtChoose();
 
     this.bga.statusBar.removeActionButtons();
     // Forecast disabled — always allow End turn; End journey handles no-I1.

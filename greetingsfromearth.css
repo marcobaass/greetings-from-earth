@@ -10,27 +10,27 @@
 
 /*
     This is the CSS stylesheet of your game User Interface.
-    
+
     Styles defined on this file will be applied to HTML elements you create (in Game.js).
-    
+
     Usually, you are using CSS to:
-    
+
     1°) define the overall layout of your game
         (ex: place the board on the top left, place player's hand beside, place the deck on the right, ...).
 
     2°) create your CSS-sprites:
         All images of your games should be gathered into a small number of image files. Then, using
-        background-image and background-position CSS properties, you create HTML blocks that can 
+        background-image and background-position CSS properties, you create HTML blocks that can
         display these images correctly (see example below).
-    
+
     3°) ... anything else:
         It is really easy to add and remove CSS classes dynamically from your Javascript with
         dojo.addClass and dojo.removeClass. It is also easy to check if an element has a class
         (dojo.hasClass) or to get all elements with a specific class (dojo.query). This is why,
         very often, using CSS classes for the logic of your user interface allow you to do complex
         thing easily.
-        
-        
+
+
      Note: on the production platform, this file will be compressed and comments will be removed.
            Consequently, don't hesitate to put as many comments as necessary.
 */
@@ -38,6 +38,15 @@
 /* Note: you must not use any @import directive */
 
 /********* You can start writing your CSS below this line: **********/
+
+/* Thematic background: seamless Berlin tile replaces the BGA wood background */
+html {
+  background-color: #fbf7ee;
+  /* cream veil on top of the tile = pattern at 50% opacity */
+  background-image: linear-gradient(rgba(251, 247, 238, 0.5), rgba(251, 247, 238, 0.5)), url("img/berlin-background.svg");
+  background-repeat: repeat;
+  background-size: 400px 400px;
+}
 
 #gfe-game-area {
   max-width: 900px;
@@ -47,6 +56,33 @@
 
 .gfe-player-board {
   max-width: 100%;
+}
+
+/* Clear separation between boards: my board first, opponents below with breathing room */
+.gfe-player-board + .gfe-player-board {
+  margin-top: 86px;
+}
+
+/* Player name above the sheet, in the player's BGA colour (set inline) */
+.gfe-player-name {
+  display: inline-block;
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+/* "Round: x / 14" above my board, in my colour (set inline) */
+#gfe-round-info {
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+/* Bright colours (yellow, spring green, …) get a dark outline so they stay readable */
+.gfe-text-outline {
+  text-shadow:
+    -1px -1px 0 #1a1a1a,
+    1px -1px 0 #1a1a1a,
+    -1px 1px 0 #1a1a1a,
+    1px 1px 0 #1a1a1a;
 }
 
 .gfe-sheet {
@@ -59,6 +95,7 @@
   background-repeat: no-repeat;
   background-position: center;
   margin: 0 auto;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
 }
 
 .gfe-play-grid {
@@ -313,10 +350,11 @@
   align-items: center;
   justify-content: center;
 }
-.gfe-street-art-choose-interactive .gfe-street-art-choose-cell {
+/* Only cells the player may mark are clickable (gfe-street-art-legal set by PlaceTile) */
+.gfe-street-art-choose-interactive .gfe-street-art-legal {
   cursor: pointer;
 }
-.gfe-street-art-choose-interactive .gfe-street-art-choose-cell:hover {
+.gfe-street-art-choose-interactive .gfe-street-art-legal:hover {
   background: rgba(255, 255, 0, 0.5);
 }
 
@@ -568,8 +606,9 @@
   background: linear-gradient(#4fb35c, #2e8b3a);
 }
 
-/* Highlighting legal cells: four L-shaped corners */
-.gfe-cell-legal-hint::before {
+/* Highlighting legal cells (play grid + street art grid): four L-shaped corners */
+.gfe-cell-legal-hint::before,
+.gfe-street-art-legal::before {
   content: "";
   position: absolute;
   inset: 2px 3px 2px 1px;

@@ -26,17 +26,24 @@ export class Game {
   }
 
   // ===== RENDERING =====
-  private renderScribbleCircle(animate = false): string {
-    return `<svg viewBox="0 0 500 500">
-            <path
-              class="gfe-scribble-circle ${animate ? "gfe-circle-draw" : ""}"              
+  /**
+   * Hand-drawn circle. With `outline`, a wider dark stroke is drawn underneath so bright
+   * colours (yellow, spring green, …) stay visible on the light map.
+   */
+  private renderScribbleCircle(animate = false, color = "black", outline = false): string {
+    const cls = `gfe-scribble-circle ${animate ? "gfe-circle-draw" : ""}`;
+    const path = (stroke: string, width: number) => `<path
+              class="${cls}"
               fill="none"
-              stroke="black"
-              stroke-width="50"
+              stroke="${stroke}"
+              stroke-width="${width}"
               stroke-linecap="round"
               stroke-linejoin="round"
               d="M 27.189 195.683 C 30.061 131.618 94.099 84.3 117.657 68.019 C 140.551 52.197 213.962 25.065 280.326 36.589 C 395.932 56.664 426.688 110.248 442.969 138.089 C 490.779 219.846 479.422 338.99 437.633 396.353 C 370.052 489.119 283.113 479.008 177.507 461.765 C 134.745 454.134 75.723 435.929 52.6 350.834 C 42.992 317.513 51.203 254.43 68.837 228.121"
-            />
+            />`;
+    return `<svg viewBox="0 0 500 500">
+            ${outline ? path("#1a1a1a", 74) : ""}
+            ${path(color, 50)}
           </svg>`;
   }
 
@@ -45,6 +52,21 @@ export class Game {
     const prev = this.scribbleCounts.get(key);
     this.scribbleCounts.set(key, count);
     return prev !== undefined && count > prev;
+  }
+
+  /** Player's BGA colour as CSS hex (BGA stores it without "#") */
+  private getPlayerColor(playerId: number): string {
+    const color = this.gamedatas.players[playerId]?.color;
+    return color ? `#${color}` : "black";
+  }
+
+  /** True for bright colours (yellow, spring green, …) that need a dark outline to stay readable */
+  private isLightColor(hex: string): boolean {
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+    if (!m) return false;
+    const [r, g, b] = m.slice(1).map((c) => parseInt(c, 16));
+    // > 150 catches yellow, orange, spring green and hot pink from the player colour list
+    return 0.299 * r + 0.587 * g + 0.114 * b > 150;
   }
 
   private renderRoundTracker(playerId: number, round: number) {
@@ -69,10 +91,12 @@ export class Game {
     ];
 
     const animateLast = this.shouldAnimateScribble(`${playerId}-round`, round);
+    const playerColor = this.getPlayerColor(playerId);
+    const outline = this.isLightColor(playerColor);
     roundTracker.innerHTML = "";
 
     for (let i = 0; i < round; i++) {
-      roundTracker.innerHTML += `<div class="gfe-round-tracker-circle" style="top: ${ROUNDS_POSITIONS[i].top}%; left: ${ROUNDS_POSITIONS[i].left}%">${this.renderScribbleCircle(animateLast && i === round - 1)}</div>`;
+      roundTracker.innerHTML += `<div class="gfe-round-tracker-circle" style="top: ${ROUNDS_POSITIONS[i].top}%; left: ${ROUNDS_POSITIONS[i].left}%">${this.renderScribbleCircle(animateLast && i === round - 1, playerColor, outline)}</div>`;
     }
   }
 
@@ -241,12 +265,16 @@ export class Game {
   setup(gamedatas: GreetingsFromEarthGamedatas) {
     this.gamedatas = gamedatas;
 
+    // Round info sits above my own board, so it takes my colour (spectators: black)
+    const roundInfoColor = this.getPlayerColor(this.bga.players.getCurrentPlayerId());
+    const roundInfoClasses = this.isLightColor(roundInfoColor) ? "gfe-text-outline" : "";
+
     // Set up the game area
     this.bga.gameArea.getElement().insertAdjacentHTML(
       "beforeend",
       `
             <div id="gfe-game-area">
-                <div id="gfe-round-info">
+                <div id="gfe-round-info" class="${roundInfoClasses}" style="color: ${roundInfoColor}">
                     Round: <span id="gfe-round">${gamedatas.currentRound}</span> / 14
                 </div>
                 <div id="gfe-player-boards"></div>
@@ -277,12 +305,14 @@ export class Game {
 
       // Tile choices sit directly above my own board (filled by PlaceTile), not in the action bar
       const tileTrayHtml = playerId === myId ? `<div id="gfe-tile-tray" class="gfe-tile-tray"></div>` : "";
+      const playerColor = this.getPlayerColor(playerId);
+      const nameClasses = `gfe-player-name${this.isLightColor(playerColor) ? " gfe-text-outline" : ""}`;
 
       document.getElementById("gfe-player-boards").insertAdjacentHTML(
         "beforeend",
         `
                 <div id="gfe-board-${playerId}" class="gfe-player-board">
-                    <strong>${player.name}</strong>
+                    <strong class="${nameClasses}" style="color: ${playerColor}">${player.name}</strong>
                     ${tileTrayHtml}
                     <div id="gfe-sheet-${playerId}" class="gfe-sheet">
                         <div id="gfe-play-grid-${playerId}" class="gfe-play-grid"></div>
@@ -671,6 +701,8 @@ export class Game {
     const mustsee = JSON.parse(String(ps.mustsee_completed || "[]")) as string[];
 
     this.bga.gameui.gamedatas.playerState.street_art_score = args.street_art_score;
+    // keep client memory in sync — the legal street art hints are computed from it
+    ps.street_art_completed = JSON.stringify(args.street_art_completed ?? []);
     this.renderMustSeeUfoTrack(
       args.player_id,
       ps.ufo_count,
